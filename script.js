@@ -50,14 +50,6 @@ class WalletManager {
         // Now initialize the Solana-specific properties
         this.TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
         this.TOKEN_PROGRAM = window.solanaWeb3.Token;
-        
-        // Use Helius RPC endpoint with API key
-        this.rpcEndpoints = {
-            mainnet: [
-                'https://mainnet.helius-rpc.com/?api-key=2cc2a540-0712-4bd3-aaf8-806470e42cf6',
-                'https://api.mainnet-beta.solana.com'
-            ]
-        };
 
         this.walletProviders = {
             phantom: {
@@ -130,31 +122,67 @@ class WalletManager {
 
         // Initialize connection
         await this.initializeConnection();
+        
+        // Start periodic health checks
+        this.startHealthMonitoring();
+    }
+
+    startHealthMonitoring() {
+        // Check connection health every 30 seconds
+        setInterval(async () => {
+            if (this.connection && this.publicKey) {
+                try {
+                    await this.switchToBetterEndpoint();
+                } catch (error) {
+                    console.warn('Health check failed:', error);
+                }
+            }
+        }, 30000);
     }
 
     async initializeConnection() {
         const fallbackEndpoints = [
-            'https://mainnet.helius-rpc.com/?api-key=2cc2a540-0712-4bd3-aaf8-806470e42cf6',
             'https://api.mainnet-beta.solana.com',
-            'https://rpc.ankr.com/solana'
+            'https://solana-mainnet.rpc.extrnode.com',
+            'https://rpc.ankr.com/solana',
+            'https://solana.public-rpc.com',
+            'https://solana-api.projectserum.com',
+            'https://mainnet.rpc.solana.com',
+            'https://solana.public-rpc.com'
         ];
 
-        for (const endpoint of fallbackEndpoints) {
+        // Try endpoints in parallel for faster connection
+        const connectionPromises = fallbackEndpoints.map(async (endpoint) => {
             try {
-                this.connection = new window.solanaWeb3.Connection(endpoint, {
+                const connection = new window.solanaWeb3.Connection(endpoint, {
                     commitment: 'confirmed',
                     fetch: this.rateLimitedFetch.bind(this)
                 });
                 
-                // Test the connection
-                await this.connection.getLatestBlockhash();
+                // Test the connection with a timeout
+                const testPromise = connection.getLatestBlockhash();
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Timeout')), 5000)
+                );
+                
+                await Promise.race([testPromise, timeoutPromise]);
                 console.log('Connected to RPC:', endpoint);
-                return;
+                return connection;
             } catch (error) {
                 console.error('Connection failed for endpoint:', endpoint, error);
-                continue;
+                return null;
             }
+        });
+
+        // Wait for the first successful connection
+        const connections = await Promise.all(connectionPromises);
+        const successfulConnection = connections.find(conn => conn !== null);
+        
+        if (successfulConnection) {
+            this.connection = successfulConnection;
+            return;
         }
+        
         throw new Error('Failed to connect to any RPC endpoint');
     }
 
@@ -179,6 +207,26 @@ class WalletManager {
         });
     }
 
+    async switchToBetterEndpoint() {
+        if (!this.connection) return;
+        
+        try {
+            // Test current connection speed
+            const startTime = Date.now();
+            await this.connection.getLatestBlockhash();
+            const responseTime = Date.now() - startTime;
+            
+            // If response time is too slow (>3 seconds), try to switch
+            if (responseTime > 3000) {
+                console.log('Current RPC is slow, attempting to switch...');
+                await this.initializeConnection();
+            }
+        } catch (error) {
+            console.log('Current RPC failed, switching to backup...');
+            await this.initializeConnection();
+        }
+    }
+
     async getBalance() {
         if (!this.publicKey || !this.connection) return '0.0000';
 
@@ -188,10 +236,21 @@ class WalletManager {
             return (balance / window.solanaWeb3.LAMPORTS_PER_SOL).toFixed(4);
         } catch (error) {
             console.error('Error fetching balance:', error);
-            // Try fallback endpoint
+            // Try to switch to a better endpoint
+            try {
+                await this.switchToBetterEndpoint();
+                if (this.connection) {
+                    const balance = await this.connection.getBalance(this.publicKey);
+                    return (balance / window.solanaWeb3.LAMPORTS_PER_SOL).toFixed(4);
+                }
+            } catch (switchError) {
+                console.error('Failed to switch endpoints:', switchError);
+            }
+            
+            // Final fallback
             try {
                 const fallbackRpc = new window.solanaWeb3.Connection(
-                    "https://solana-mainnet.rpc.extrnode.com",
+                    "https://solana.public-rpc.com",
                     'confirmed'
                 );
                 const fallbackBalance = await fallbackRpc.getBalance(this.publicKey);
