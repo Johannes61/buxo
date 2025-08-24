@@ -136,7 +136,6 @@ class WalletManager {
         const fallbackEndpoints = [
             'https://mainnet.helius-rpc.com/?api-key=2cc2a540-0712-4bd3-aaf8-806470e42cf6',
             'https://api.mainnet-beta.solana.com',
-            'https://solana-mainnet.g.alchemy.com/v2/your-api-key',
             'https://rpc.ankr.com/solana'
         ];
 
@@ -144,13 +143,16 @@ class WalletManager {
             try {
                 this.connection = new window.solanaWeb3.Connection(endpoint, {
                     commitment: 'confirmed',
-                    wsEndpoint: endpoint.replace('https', 'wss'),
                     fetch: this.rateLimitedFetch.bind(this)
                 });
+                
+                // Test the connection
+                await this.connection.getLatestBlockhash();
                 console.log('Connected to RPC:', endpoint);
                 return;
             } catch (error) {
                 console.error('Connection failed for endpoint:', endpoint, error);
+                continue;
             }
         }
         throw new Error('Failed to connect to any RPC endpoint');
@@ -486,6 +488,15 @@ class WalletManager {
 
     async getAbandonedAccounts() {
         if (!this.publicKey) return [];
+        if (!this.connection) {
+            console.warn('Connection not ready, attempting to initialize...');
+            try {
+                await this.initializeConnection();
+            } catch (error) {
+                console.error('Failed to initialize connection:', error);
+                return [];
+            }
+        }
         
         try {
             const accounts = await this.connection.getParsedTokenAccountsByOwner(
@@ -522,6 +533,15 @@ class WalletManager {
 
     async getTokenAccounts() {
         if (!this.publicKey) return [];
+        if (!this.connection) {
+            console.warn('Connection not ready, attempting to initialize...');
+            try {
+                await this.initializeConnection();
+            } catch (error) {
+                console.error('Failed to initialize connection:', error);
+                return [];
+            }
+        }
         
         try {
             const accounts = await this.connection.getParsedTokenAccountsByOwner(
@@ -885,11 +905,12 @@ class UI {
     }
 
     async refreshAccounts() {
+        let refreshBtn = null;
         try {
             this.showLoading('Refreshing accounts...');
             
             // Update refresh button with loading state
-            const refreshBtn = document.getElementById('refresh-accounts');
+            refreshBtn = document.getElementById('refresh-accounts');
             if (refreshBtn) {
                 refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
                 refreshBtn.disabled = true;
