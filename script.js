@@ -1,3 +1,28 @@
+// Global cache notice handler
+function handleCacheNotice() {
+    const notice = document.getElementById('cache-notice');
+    if (notice) {
+        // Auto-remove after 10 seconds
+        setTimeout(() => {
+            if (notice.parentElement) {
+                notice.style.opacity = '0';
+                notice.style.transition = 'opacity 0.5s';
+                setTimeout(() => notice.remove(), 500);
+            }
+        }, 10000);
+        
+        // Add click to refresh functionality
+        notice.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+                window.location.reload(true);
+            }
+        });
+    }
+}
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', handleCacheNotice);
+
 class WalletManager {
     constructor() {
         // Initialize basic properties first
