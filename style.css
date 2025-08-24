@@ -1,0 +1,1458 @@
+/* Dashboard container styling */
+.dashboard-container {
+    display: flex;
+    gap: 3rem;
+    width: calc(100% - 6rem);
+    margin: 3rem auto;
+    padding: 0 3rem;
+    height: calc(100vh - 160px);
+}
+
+/* Common section styles for Abandoned Accounts and Referral Program */
+.abandoned-accounts,
+.referral-section {
+    background: var(--card-color);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--card-radius);
+    padding: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    position: relative; /* For positioning the Claim All button */
+}
+
+/* Header styling */
+.accounts-header,
+.referral-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.accounts-header h2,
+.referral-header h2 {
+    color: var(--primary-color);
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+/* Content areas */
+.accounts-list,
+.referral-content {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 1rem;
+    margin-bottom: 2rem;
+}
+
+/* Refresh button styling */
+.refresh-btn {
+    background: transparent;
+    border: none;
+    color: var(--primary-color);
+    cursor: pointer;
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+.refresh-btn:hover {
+    transform: rotate(180deg);
+}
+.refresh-btn i {
+    font-size: 1.2rem;
+}
+
+/* Abandoned Account Card Styling */
+.abandoned-account {
+    background: var(--surface-color);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--button-radius);
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+.abandoned-account:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+}
+
+/* Account Info Styling */
+.account-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.account-address {
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+.account-balance {
+    color: var(--primary-color);
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+/* Individual Claim Button Styling */
+.btn-claim {
+    background: transparent;
+    border: none;
+    color: var(--primary-color);
+    cursor: pointer;
+    padding: 0.8rem;
+    font-size: 1.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    border-radius: 8px;
+}
+.btn-claim:hover {
+    transform: scale(1.1);
+}
+.btn-claim i {
+    font-size: 1.4rem;
+}
+
+/* Claim All Button Container (positioned at the bottom) */
+.claim-all-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 1.5rem 2.5rem;
+    border-top: 1px solid var(--glass-border);
+    margin-top: auto;
+    background: transparent;
+}
+/* Claim All Button Styling */
+.claim-all-button {
+    width: 100%;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: var(--button-radius);
+    padding: 12px 24px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: 0.2px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+.claim-all-button:hover {
+    background: var(--secondary-color);
+    transform: translateY(-1px);
+}
+.claim-all-button i {
+    font-size: 1.2rem;
+}
+
+/* Referral Program Styling */
+/* Referral Link Container */
+.referral-link-container {
+    background: transparent !important;
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+}
+.referral-link-input {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+.referral-link {
+    background: var(--surface-color);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--button-radius);
+    padding: 12px 16px;
+    color: var(--text-color);
+    font-family: 'JetBrains Mono', monospace;
+    flex: 1;
+    transition: all 0.3s ease;
+}
+.referral-link:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px var(--glow-color);
+}
+/* Copy Button within Referral */
+.copy-button {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.8rem 1.2rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+/* Referral Stats Styling */
+.referral-stats {
+    display: grid;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+.stat-card {
+    background: var(--surface-color);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--card-radius);
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+}
+.stat-card:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 20px var(--glow-color);
+}
+.stat-label {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 0.8rem;
+}
+.stat-value {
+    color: var(--primary-color);
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+/* Empty State Styling */
+.empty-state {
+    text-align: center;
+    padding: 3rem 2rem;
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    color: var(--text-secondary);
+    background: var(--surface-color);
+}
+.empty-state i {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+}
+.empty-state p {
+    font-size: 1.1rem;
+    opacity: 0.8;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 1400px) {
+    .dashboard-container {
+        width: calc(100% - 4rem);
+        padding: 0 2rem;
+    }
+}
+
+/* ----------------------- Full CSS Below ----------------------- */
+
+:root {
+    /* Updated color scheme with white theme */
+    --primary-color: #5C67FF;
+    --secondary-color: #7D85FF;
+    --background-color: #ffffff;
+    --surface-color: rgba(250, 250, 250, 0.9);
+    --card-color: rgba(255, 255, 255, 0.95);
+    --text-color: #1A1A1A;
+    --text-secondary: #666666;
+    --gradient: linear-gradient(135deg, #5C67FF, #7D85FF);
+    --glass-border: rgba(0, 0, 0, 0.1);
+    --nav-background: rgba(255, 255, 255, 0.9);
+    --nav-hover-background: rgba(255, 255, 255, 0.9); /* Adjust this value */
+    
+    /* Updated Jito-style variables for light theme */
+    --glow-color: rgba(92, 103, 255, 0.1);
+    --hover-glow: rgba(92, 103, 255, 0.15);
+    --card-radius: 16px;
+    --button-radius: 12px;
+    --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+body {
+    background-color: var(--background-color);
+    /* color: var(--text-color); */
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.5;
+    min-height: 100vh;
+}
+
+/* Updated gradient background for light theme */
+.dynamic-bg {
+    background: radial-gradient(circle at top left, rgba(92, 103, 255, 0.05), transparent 50%),
+                radial-gradient(circle at bottom right, rgba(125, 133, 255, 0.05), transparent 50%);
+    opacity: 0.8;
+}
+
+/* Remove glow effect and simplify dynamic background */
+.dynamic-bg::before {
+    display: none;
+}
+
+/* Stars Animation */
+.stars-container,
+.star,
+.star::after,
+@keyframes starFloat {
+    display: none;
+}
+
+/* Glass Effects */
+.glass-effect {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+    box-shadow: 
+        0 8px 32px 0 rgba(0, 0, 0, 0.2),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    transition: all 0.3s ease;
+}
+
+.glass-effect:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--primary-color);
+}
+
+.glass-nav {
+    background: rgba(10, 10, 10, 0.8);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--glass-border);
+}
+
+/* Navigation */
+nav {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--glass-border);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 32px;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    transition: all 0.3s ease;
+}
+
+.logo {
+    text-decoration: none;
+    height: 40px; /* Fixed height */
+    width: auto;
+    display: flex;
+    align-items: center;
+}
+
+nav:hover {
+  background: rgba(255,255,255,0.9); /* Matches the default background */
+}
+
+.logo img {
+    height: 40px; /* Match container height */
+    width: auto;
+    object-fit: contain;
+    margin-right: 1rem;
+}
+
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* Network Selector */
+.network-selector {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--surface-color);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 0.5rem 1rem;
+    color: var(--text-color);
+}
+
+#network-select {
+    background: transparent;
+    border: none;
+    color: var(--text-color);
+    font-size: 0.9rem;
+    padding-right: 1.5rem;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+
+.network-selector::after {
+    content: '▼';
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    pointer-events: none;
+    font-size: 0.8rem;
+}
+
+/* Connect Wallet Button */
+.connect-wallet {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: var(--button-radius);
+    padding: 12px 24px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.connect-wallet:hover {
+    background: var(--secondary-color);
+    box-shadow: 0 0 20px var(--glow-color);
+    transform: translateY(-1px);
+}
+
+.connect-wallet.connected {
+    background: var(--card-color);
+    border: 1px solid var(--glass-border);
+    padding: 0.5rem 1rem;
+}
+
+/* Hero Badge */
+.hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(0, 184, 148, 0.1);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    margin-bottom: 2rem;
+}
+
+.hero-badge .pulse {
+    width: 8px;
+    height: 8px;
+    background: var(--success-color);
+    border-radius: 50%;
+    position: relative;
+}
+
+.hero-badge .pulse::after {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    right: -4px;
+    bottom: -4px;
+    border: 2px solid var(--success-color);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+/* Wallet Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.modal-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.wallet-modal {
+    background: var(--card-color);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    padding: 2rem;
+    max-width: 500px;
+    width: 90%;
+}
+
+.modal-overlay.show .wallet-modal {
+    transform: scale(1);
+}
+
+.modal-header {
+    background: transparent;
+    padding: 0 0 1.5rem 0;
+    border-bottom: 1px solid var(--glass-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.close-modal {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.close-modal:hover {
+    color: var(--text-color);
+    transform: rotate(90deg);
+}
+
+.wallet-options {
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+    margin-right: -0.5rem;
+}
+
+.wallet-option {
+    background: var(--surface-color);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--button-radius);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.wallet-option:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 20px var(--glow-color);
+    transform: translateY(-2px);
+}
+
+.wallet-option .wallet-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.wallet-option img {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    object-fit: contain;
+}
+
+.wallet-name {
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.wallet-badge {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    background: rgba(0, 184, 148, 0.1);
+    color: var(--primary-color);
+}
+
+.wallet-badge.install {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
+}
+
+/* Balance Display */
+.balance-container {
+    background: linear-gradient(135deg, rgba(0, 184, 148, 0.1), rgba(0, 184, 148, 0.05));
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 2rem;
+    margin: 2rem 0;
+    animation: fadeIn 0.5s ease-out;
+    transition: all 0.3s ease;
+}
+
+.balance-container:hover {
+    transform: translateY(-2px);
+    animation: glowPulse 2s infinite;
+}
+
+.balance-label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.balance {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    text-shadow: 0 0 20px rgba(0, 184, 148, 0.3);
+}
+
+/* Animations */
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 0.5;
+    }
+    70% {
+        transform: scale(1.5);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 0;
+    }
+}
+
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* Main Content */
+main {
+    padding-top: 32px;
+    min-height: 100vh;
+}
+
+/* Pre-connect State */
+#pre-connect {
+    padding: 4rem 5%;
+    text-align: center;
+}
+
+.hero-content {
+    text-align: center;
+    max-width: 800px;
+    margin: 8rem auto 4rem;
+}
+
+.hero-content h1 {
+    font-size: 4rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 1.5rem;
+    line-height: 1.1;
+}
+
+.gradient-text {
+    background: var(--gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.hero-subtitle {
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    margin-bottom: 3rem;
+}
+
+.connect-prompt {
+    margin: 3rem 0;
+}
+
+.large-connect-btn {
+    background: var(--gradient);
+    color: white;
+    border: none;
+    padding: 1.5rem 3rem;
+    border-radius: 12px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 0 auto;
+    transition: all 0.3s ease;
+}
+
+.large-connect-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(0, 184, 148, 0.2);
+}
+
+/* Live Stats */
+.live-stats {
+    display: none;
+}
+
+/* Post-connect State */
+.dashboard-container {
+    display: flex;
+    gap: 3rem;
+    width: calc(100% - 6rem);
+    margin: 3rem auto;
+    padding: 0 3rem;
+    height: calc(100vh - 160px);
+}
+
+/* Common section styles */
+.abandoned-accounts,
+.referral-section {
+    background: transparent !important;
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    position: relative; /* For claim all positioning */
+}
+
+/* Common header styles */
+.accounts-header,
+.referral-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.accounts-header h2,
+.referral-header h2 {
+    color: var(--primary-color);
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+/* Content areas */
+.accounts-list,
+.referral-content {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 1rem;
+    margin-bottom: 2rem; /* Space for bottom buttons */
+}
+
+/* Referral stats styling */
+.referral-stats {
+    display: grid;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: transparent !important;
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    border-color: var(--primary-color);
+}
+
+/* Referral link container */
+.referral-link-container {
+    background: transparent !important;
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+}
+
+.referral-link-input {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.referral-link {
+    background: transparent !important;
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    padding: 0.8rem 1rem;
+    color: var(--text-color);
+    font-family: 'JetBrains Mono', monospace;
+    flex: 1;
+}
+
+/* Claim all button container */
+.claim-all-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 1.5rem 2.5rem;
+    border-top: 1px solid var(--glass-border);
+    margin-top: auto;
+    background: transparent;
+}
+
+.claim-all-button {
+    width: 100%;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 1rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    transition: all 0.3s ease;
+}
+
+.claim-all-button:hover {
+    background: var(--secondary-color);
+    transform: translateY(-2px);
+}
+
+.claim-all-button i {
+    font-size: 1.2rem;
+}
+
+/* Account cards */
+.abandoned-account {
+    background: transparent;
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.abandoned-account:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+}
+
+/* Improve scrollbars */
+.accounts-list::-webkit-scrollbar,
+.referral-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.accounts-list::-webkit-scrollbar-track,
+.referral-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.accounts-list::-webkit-scrollbar-thumb,
+.referral-content::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: 3px;
+    opacity: 0.5;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1400px) {
+    .dashboard-container {
+        width: calc(100% - 4rem);
+        padding: 0 2rem;
+    }
+}
+
+/* Utility Classes */
+.hidden {
+    display: none !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .stars-container .star {
+        display: none;
+    }
+    
+    nav {
+        padding: 1rem;
+    }
+    
+    .network-status {
+        padding: 0.5rem;
+    }
+
+    .nav-links {
+        gap: 0.5rem;
+    }
+
+    #network-select {
+        font-size: 0.8rem;
+    }
+
+    .connect-wallet {
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+    }
+
+    .wallet-modal {
+        width: 95%;
+        margin: 1rem;
+    }
+
+    .hero-content h1 {
+        font-size: 2.5rem;
+    }
+
+    .live-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .wallet-info {
+        padding: 0.6rem 1rem;
+        font-size: 0.8rem;
+    }
+
+    .wallet-balance {
+        padding-left: 0.5rem;
+    }
+
+    .large-connect-btn {
+        padding: 1.2rem 2rem;
+        font-size: 1rem;
+    }
+
+    .claim-all-btn {
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+    }
+
+    .abandoned-account {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+    
+    .btn-claim {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* Loading Animation */
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(0, 184, 148, 0.1);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Toast Notifications */
+.toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 2000;
+}
+
+.toast {
+    background: var(--card-color);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--button-radius);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    padding: 1rem;
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    animation: slideIn 0.3s ease forwards;
+}
+
+/* Updated hover effects with pulse instead of movement */
+.connect-wallet, .large-connect-btn, .wallet-option {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    border: 1px solid var(--glass-border);
+}
+
+.connect-wallet:hover, .large-connect-btn:hover, .wallet-option:hover {
+    transform: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 20px var(--glow-color);
+    animation: glow 2s infinite;
+}
+
+@keyframes glow {
+    0% {
+        box-shadow: 0 0 20px var(--glow-color);
+    }
+    50% {
+        box-shadow: 0 0 30px var(--hover-glow);
+    }
+    100% {
+        box-shadow: 0 0 20px var(--glow-color);
+    }
+}
+
+/* Improved wallet info display */
+.wallet-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.2rem;
+}
+
+.wallet-address {
+    color: var(--text-color);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9rem;
+}
+
+.wallet-balance {
+    color: var(--primary-color);
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+/* Update connect wallet button states */
+.connect-wallet.hidden {
+    display: none;
+}
+
+#hero-connect.hidden {
+    display: none;
+}
+
+/* Updated nav-links layout */
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* Improved animations */
+@keyframes fadeIn {
+    from { 
+        opacity: 0; 
+        transform: translateY(20px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Enhanced Search Bar */
+.wallet-search {
+    position: relative;
+    margin: 1.5rem 0;
+}
+
+.wallet-search input {
+    width: 100%;
+    padding: 1rem 1rem 1rem 2.5rem;
+    background: var(--surface-color);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    color: var(--text-color);
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+
+.wallet-search input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 0 2px rgba(0, 184, 148, 0.1);
+}
+
+.wallet-search i {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    pointer-events: none;
+}
+
+/* Scrollbar Styling */
+.wallet-options::-webkit-scrollbar {
+    width: 6px;
+}
+
+.wallet-options::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.wallet-options::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: 3px;
+}
+
+.wallet-options::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Swap Container Styles */
+.swap-container {
+    max-width: 480px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+    border-radius: 20px;
+}
+
+.swap-tabs {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.tab-btn.active {
+    color: var(--primary-color);
+    border-bottom: 2px solid var(--primary-color);
+}
+
+.swap-box {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 16px;
+    padding: 1.5rem;
+}
+
+.token-input {
+    margin-bottom: 1rem;
+}
+
+.token-input label {
+    display: block;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.input-group {
+    display: flex;
+    gap: 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 0.75rem;
+}
+
+.input-group input {
+    background: transparent;
+    border: none;
+    color: var(--text-color);
+    font-size: 1.2rem;
+    width: 100%;
+}
+
+.input-group input:focus {
+    outline: none;
+}
+
+.token-select {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    color: var(--text-color);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.token-select:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.token-select img {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+}
+
+.swap-direction {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: var(--primary-color);
+    border: none;
+    border-radius: 50%;
+    margin: 1rem auto;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.swap-direction:hover {
+    transform: rotate(180deg);
+    background: var(--secondary-color);
+}
+
+.swap-details {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+}
+
+.detail-item {
+    display: flex;
+    justify-content: space-between;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.detail-item:last-child {
+    margin-bottom: 0;
+}
+
+.swap-button {
+    width: 100%;
+    background: var(--gradient);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.swap-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 20px rgba(0, 184, 148, 0.2);
+}
+
+.swap-button:disabled {
+    background: var(--surface-color);
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Add referral system styles */
+.referral-section {
+    flex: 2;
+    background: rgba(26, 26, 26, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 2rem;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.referral-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.referral-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.referral-stats {
+    display: grid;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: var(--card-color);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 1.8rem;
+}
+
+.stat-label {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 0.8rem;
+}
+
+.stat-value {
+    color: var(--primary-color);
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.referral-link-container {
+    background: transparent !important;
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.referral-link-input {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.referral-link {
+    background: transparent !important;
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    padding: 0.8rem 1rem;
+    color: var(--text-color);
+    font-family: 'JetBrains Mono', monospace;
+    flex: 1;
+}
+
+.copy-button {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.8rem 1.2rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.copy-button:hover {
+    background: var(--secondary-color);
+}
+
+.referral-info {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.referral-info strong {
+    color: var(--primary-color);
+}
+
+/* Style all font awesome icons */
+.fa {
+    padding: 20px;
+    font-size: 30px;
+    width: 50px;
+    text-align: center;
+    text-decoration: none;
+}
+
+/* Add a hover effect if you want */
+.fa:hover {
+    opacity: 0.7;
+}
+
+/* Set a specific color for each brand */
+
+/* Facebook */
+.fa-facebook {
+    background: #3B5998;
+    color: white;
+}
+
+/* Twitter */
+.fa-twitter {
+    background: #55ACEE;
+    color: white;
+}
+
+/* Announcement Banner */
+.announcement-banner {
+    background: var(--gradient);
+    color: white;
+    text-align: center;
+    padding: 6px 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    position: relative;
+    overflow: hidden;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.announcement-text {
+    position: absolute;
+    width: 100%;
+    opacity: 0;
+    transform: translateY(100%);
+    transition: all 0.5s ease;
+}
+
+.announcement-text.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.announcement-text.exit {
+    opacity: 0;
+    transform: translateY(-100%);
+}
+
+/* Adjust nav position to account for banner */
+nav {
+    top: 32px;
+}
+
+/* Adjust main content to account for banner */
+main {
+    margin-top: 32px;
+}
