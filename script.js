@@ -6,11 +6,6 @@ class WalletManager {
         this.publicKey = null;
         this.currentProvider = null;
         this.rateLimitMap = new Map();
-        this.connectionRetries = 0;
-        this.maxRetries = 3;
-        this.healthCheckInterval = null;
-        this.lastHealthCheck = 0;
-        this.connectionHealth = 'healthy';
         
         this.accountData = {
             balance: 0,
@@ -133,34 +128,32 @@ class WalletManager {
             }
         };
 
-        // Initialize connection and health monitoring
+        // Initialize connection
         await this.initializeConnection();
-        this.startHealthMonitoring();
     }
 
-    startHealthMonitoring() {
-        this.healthCheckInterval = setInterval(async () => {
-            if (this.connection && Date.now() - this.lastHealthCheck > 30000) {
-                try {
-                    await this.connection.getLatestBlockhash();
-                    this.connectionHealth = 'healthy';
-                    this.lastHealthCheck = Date.now();
-                } catch (error) {
-                    console.warn('Connection health check failed:', error);
-                    this.connectionHealth = 'degraded';
-                    if (this.connectionHealth === 'degraded') {
-                        await this.initializeConnection();
-                    }
-                }
+    async initializeConnection() {
+        const fallbackEndpoints = [
+            'https://mainnet.helius-rpc.com/?api-key=2cc2a540-0712-4bd3-aaf8-806470e42cf6',
+            'https://api.mainnet-beta.solana.com',
+            'https://solana-mainnet.g.alchemy.com/v2/your-api-key',
+            'https://rpc.ankr.com/solana'
+        ];
+
+        for (const endpoint of fallbackEndpoints) {
+            try {
+                this.connection = new window.solanaWeb3.Connection(endpoint, {
+                    commitment: 'confirmed',
+                    wsEndpoint: endpoint.replace('https', 'wss'),
+                    fetch: this.rateLimitedFetch.bind(this)
+                });
+                console.log('Connected to RPC:', endpoint);
+                return;
+            } catch (error) {
+                console.error('Connection failed for endpoint:', endpoint, error);
             }
-        }, 30000);
-    }
-
-    stopHealthMonitoring() {
-        if (this.healthCheckInterval) {
-            clearInterval(this.healthCheckInterval);
-            this.healthCheckInterval = null;
         }
+        throw new Error('Failed to connect to any RPC endpoint');
     }
 
     rateLimitedFetch(url, opts) {
@@ -291,50 +284,10 @@ class WalletManager {
             this.currentProvider = wallet;
             this.publicKey = response.publicKey || wallet.publicKey;
             
-            // Enhanced connection success handling
-            this.onWalletConnected(providerId);
-            
             return true;
         } catch (error) {
             console.error('Wallet connection error:', error);
             throw error;
-        }
-    }
-
-    onWalletConnected(providerId) {
-        // Store connection preference
-        localStorage.setItem('preferredWallet', providerId);
-        
-        // Track connection success
-        this.trackEvent('wallet_connected', { provider: providerId });
-        
-        // Update connection health
-        this.connectionHealth = 'healthy';
-    }
-
-    trackEvent(eventName, data = {}) {
-        // Simple analytics tracking
-        try {
-            const eventData = {
-                event: eventName,
-                timestamp: Date.now(),
-                wallet: this.currentProvider?.name || 'unknown',
-                network: this.currentNetwork,
-                ...data
-            };
-            
-            // Store in localStorage for analytics
-            const events = JSON.parse(localStorage.getItem('analytics_events') || '[]');
-            events.push(eventData);
-            
-            // Keep only last 100 events
-            if (events.length > 100) {
-                events.splice(0, events.length - 100);
-            }
-            
-            localStorage.setItem('analytics_events', JSON.stringify(events));
-        } catch (error) {
-            console.warn('Analytics tracking failed:', error);
         }
     }
 
@@ -400,19 +353,9 @@ class WalletManager {
             this.stats.totalClaimed++;
             this.stats.recentClaims++;
             
-            // Track successful claim
-            this.trackEvent('account_claimed', { 
-                account: accountPubkey,
-                amount: userAmount / window.solanaWeb3.LAMPORTS_PER_SOL
-            });
-            
             return signature;
         } catch (error) {
             console.error('Error claiming account:', error);
-            this.trackEvent('claim_failed', { 
-                account: accountPubkey,
-                error: error.message 
-            });
             throw error;
         }
     }
@@ -430,13 +373,6 @@ class WalletManager {
         console.log('Wallet disconnected');
         this.publicKey = null;
         this.currentProvider = null;
-        
-        // Track disconnection
-        this.trackEvent('wallet_disconnected');
-        
-        // Stop health monitoring
-        this.stopHealthMonitoring();
-        
         document.dispatchEvent(new CustomEvent('walletDisconnected'));
     }
 
@@ -444,7 +380,6 @@ class WalletManager {
         console.log('Account changed:', publicKey);
         if (publicKey) {
             this.publicKey = publicKey;
-            this.trackEvent('account_changed', { publicKey: publicKey.toString() });
             document.dispatchEvent(new CustomEvent('accountChanged', { 
                 detail: publicKey 
             }));
@@ -480,13 +415,13 @@ class WalletManager {
                 throw new Error('Wallet not connected');
             }
 
-                    const transaction = new window.solanaWeb3.Transaction().add(
-            window.solanaWeb3.SystemProgram.close({
-                fromPubkey: new window.solanaWeb3.PublicKey(pubkey),
-                toPubkey: this.publicKey,
-                lamports: 0 // Will close entire account
-            })
-        );
+            const transaction = new window.solanaWeb3.Transaction().add(
+                window.solanaWeb3.SystemProgram.close({
+                    fromPubkey: new window.solanaWeb3.PublicKey(pubkey),
+                    toPubkey: this.publicKey,
+                    lamports: 0 // Will close entire account
+                })
+            );
 
             const signature = await this.currentProvider.signAndSendTransaction(transaction);
             await this.connection.confirmTransaction(signature);
@@ -541,12 +476,6 @@ class WalletManager {
 
             const signature = await this.currentProvider.signAndSendTransaction(transaction);
             await this.connection.confirmTransaction(signature);
-            
-            // Track referral
-            this.trackEvent('referral_processed', { 
-                referralAddress, 
-                amount: referralReward 
-            });
             
             return signature;
         } catch (error) {
@@ -617,9 +546,9 @@ class WalletManager {
 
     async getTokenAccountBalance(tokenAccountPubkey) {
         try {
-                    const balance = await this.connection.getTokenAccountBalance(
-            new window.solanaWeb3.PublicKey(tokenAccountPubkey)
-        );
+            const balance = await this.connection.getTokenAccountBalance(
+                new window.solanaWeb3.PublicKey(tokenAccountPubkey)
+            );
             return balance.value;
         } catch (error) {
             console.error('Error getting token balance:', error);
@@ -634,10 +563,10 @@ class WalletManager {
 
         try {
             // Create the transaction
-                    const transaction = new window.solanaWeb3.Transaction();
-        
-        // Create close account instruction
-        const instruction = new window.solanaWeb3.TransactionInstruction({
+            const transaction = new window.solanaWeb3.Transaction();
+            
+            // Create close account instruction
+            const instruction = new window.solanaWeb3.TransactionInstruction({
                 keys: [
                     { pubkey: new window.solanaWeb3.PublicKey(tokenAccountPubkey), isSigner: false, isWritable: true },
                     { pubkey: this.publicKey, isSigner: true, isWritable: true },
@@ -726,12 +655,6 @@ class WalletManager {
                 }
             }
 
-            // Track bulk claim
-            this.trackEvent('bulk_claim_completed', { 
-                accountsClosed: signatures.length,
-                totalClaimed 
-            });
-
             return {
                 totalClaimed,
                 signatures,
@@ -792,12 +715,12 @@ class WalletManager {
 
     async getTokenAccountDetails(tokenAccountPubkey) {
         try {
-                    const account = await this.connection.getParsedAccountInfo(
-            new window.solanaWeb3.PublicKey(tokenAccountPubkey)
-        );
-        const mintInfo = await this.connection.getParsedAccountInfo(
-            new window.solanaWeb3.PublicKey(account.data.parsed.info.mint)
-        );
+            const account = await this.connection.getParsedAccountInfo(
+                new window.solanaWeb3.PublicKey(tokenAccountPubkey)
+            );
+            const mintInfo = await this.connection.getParsedAccountInfo(
+                new window.solanaWeb3.PublicKey(account.data.parsed.info.mint)
+            );
             return {
                 mint: account.data.parsed.info.mint,
                 owner: account.data.parsed.info.owner,
@@ -813,19 +736,19 @@ class WalletManager {
 
     async estimateClaimGas(tokenAccountPubkey) {
         try {
-                    const transaction = new window.solanaWeb3.Transaction();
-        transaction.add(
-            new window.solanaWeb3.TransactionInstruction({
-                keys: [
-                    { pubkey: new window.solanaWeb3.PublicKey(tokenAccountPubkey), isSigner: false, isWritable: true },
-                    { pubkey: this.publicKey, isSigner: true, isWritable: true },
-                    { pubkey: this.publicKey, isSigner: false, isWritable: true },
-                    { pubkey: this.TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-                ],
-                programId: this.TOKEN_PROGRAM_ID,
-                data: new Uint8Array([9])
-            })
-        );
+            const transaction = new window.solanaWeb3.Transaction();
+            transaction.add(
+                new window.solanaWeb3.TransactionInstruction({
+                    keys: [
+                        { pubkey: new window.solanaWeb3.PublicKey(tokenAccountPubkey), isSigner: false, isWritable: true },
+                        { pubkey: this.publicKey, isSigner: true, isWritable: true },
+                        { pubkey: this.publicKey, isSigner: false, isWritable: true },
+                        { pubkey: this.TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+                    ],
+                    programId: this.TOKEN_PROGRAM_ID,
+                    data: new Uint8Array([9])
+                })
+            );
             
             const { value: fees } = await this.connection.getFeeForMessage(
                 transaction.compileMessage(),
@@ -859,29 +782,6 @@ class WalletManager {
             return null;
         }
     }
-
-    // Enhanced method to get connection status
-    getConnectionStatus() {
-        return {
-            health: this.connectionHealth,
-            network: this.currentNetwork,
-            lastCheck: this.lastHealthCheck,
-            retries: this.connectionRetries
-        };
-    }
-
-    // Method to get performance metrics
-    getPerformanceMetrics() {
-        const events = JSON.parse(localStorage.getItem('analytics_events') || '[]');
-        const recentEvents = events.filter(e => Date.now() - e.timestamp < 24 * 60 * 60 * 1000);
-        
-        return {
-            totalEvents: events.length,
-            recentEvents: recentEvents.length,
-            connectionHealth: this.connectionHealth,
-            walletProvider: this.currentProvider?.name || 'none'
-        };
-    }
 }
 
 class UI {
@@ -892,13 +792,6 @@ class UI {
         this.scanningAnimation = null;
         this.referralAddress = null;
         
-        // Enhanced features
-        this.notificationQueue = [];
-        this.isProcessingNotifications = false;
-        this.autoRefreshInterval = null;
-        this.lastRefresh = 0;
-        this.refreshCooldown = 10000; // 10 seconds
-        
         // Add announcements
         this.announcements = [
             "Lowest fees on the market",
@@ -907,9 +800,6 @@ class UI {
         ];
         this.currentAnnouncementIndex = 0;
         this.initializeAnnouncements();
-        
-        // Initialize enhanced features
-        this.initializeEnhancedFeatures();
     }
 
     async setupEventListeners() {
@@ -974,9 +864,6 @@ class UI {
 
         // Keyboard shortcuts
         this.setupKeyboardShortcuts();
-        
-        // Auto-refresh functionality
-        this.setupAutoRefresh();
     }
 
     setupKeyboardShortcuts() {
@@ -997,23 +884,8 @@ class UI {
         });
     }
 
-    setupAutoRefresh() {
-        // Auto-refresh every 30 seconds when connected
-        this.autoRefreshInterval = setInterval(() => {
-            if (this.walletManager.publicKey && Date.now() - this.lastRefresh > 30000) {
-                this.refreshAccounts();
-            }
-        }, 30000);
-    }
-
     async refreshAccounts() {
-        if (Date.now() - this.lastRefresh < this.refreshCooldown) {
-            this.showNotification('Please wait before refreshing again', 'info');
-            return;
-        }
-
         try {
-            this.lastRefresh = Date.now();
             this.showLoading('Refreshing accounts...');
             
             // Update refresh button with loading state
@@ -1082,39 +954,6 @@ class UI {
         }
     }
 
-    initializeEnhancedFeatures() {
-        // Initialize connection status indicator
-        this.updateConnectionStatus();
-        
-        // Set up periodic status updates
-        setInterval(() => {
-            this.updateConnectionStatus();
-        }, 30000);
-        
-        // Initialize performance monitoring
-        this.initializePerformanceMonitoring();
-    }
-
-    updateConnectionStatus() {
-        const status = this.walletManager.getConnectionStatus();
-        const statusDot = document.querySelector('.status-dot');
-        
-        if (statusDot) {
-            statusDot.className = `status-dot ${status.health}`;
-            statusDot.title = `Connection: ${status.health} | Network: ${status.network}`;
-        }
-    }
-
-    initializePerformanceMonitoring() {
-        // Monitor and log performance metrics
-        setInterval(() => {
-            const metrics = this.walletManager.getPerformanceMetrics();
-            if (metrics.recentEvents > 50) {
-                console.log('High activity detected:', metrics);
-            }
-        }, 60000);
-    }
-
     async handleWalletConnection(providerId) {
         try {
             this.showLoading('Connecting wallet...');
@@ -1143,9 +982,6 @@ class UI {
             
             this.hideLoading();
             this.showNotification('Wallet connected successfully!', 'success');
-            
-            // Start auto-refresh for connected state
-            this.setupAutoRefresh();
         } catch (error) {
             this.hideLoading();
             this.showNotification(error.message, 'error');
@@ -1229,55 +1065,30 @@ class UI {
     }
 
     showNotification(message, type = 'info') {
-        // Add to queue
-        this.notificationQueue.push({ message, type });
+        const toast = document.createElement('div');
+        toast.className = `toast ${type} slide-in`;
+        toast.innerHTML = `
+            <i class="fas fa-${this.getNotificationIcon(type)}"></i>
+            <div class="toast-content">
+                <p>${message}</p>
+            </div>
+            <button class="toast-close" onclick="this.parentElement.remove()">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
         
-        // Process queue if not already processing
-        if (!this.isProcessingNotifications) {
-            this.processNotificationQueue();
-        }
-    }
-
-    async processNotificationQueue() {
-        if (this.isProcessingNotifications || this.notificationQueue.length === 0) {
-            return;
-        }
-
-        this.isProcessingNotifications = true;
-
-        while (this.notificationQueue.length > 0) {
-            const { message, type } = this.notificationQueue.shift();
+        const container = document.querySelector('.toast-container');
+        if (container) {
+            container.appendChild(toast);
             
-            const toast = document.createElement('div');
-            toast.className = `toast ${type} slide-in`;
-            toast.innerHTML = `
-                <i class="fas fa-${this.getNotificationIcon(type)}"></i>
-                <div class="toast-content">
-                    <p>${message}</p>
-                </div>
-                <button class="toast-close" onclick="this.parentElement.remove()">
-                    <i class="fas fa-times"></i>
-                </button>
-            `;
-            
-            const container = document.querySelector('.toast-container');
-            if (container) {
-                container.appendChild(toast);
-                
-                // Auto-remove after 4 seconds
-                setTimeout(() => {
-                    if (toast.parentElement) {
-                        toast.classList.add('slide-out');
-                        setTimeout(() => toast.remove(), 300);
-                    }
-                }, 4000);
-                
-                // Wait a bit before showing next notification
-                await new Promise(resolve => setTimeout(resolve, 100));
-            }
+            // Auto-remove after 4 seconds
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.classList.add('slide-out');
+                    setTimeout(() => toast.remove(), 300);
+                }
+            }, 4000);
         }
-
-        this.isProcessingNotifications = false;
     }
 
     getNotificationIcon(type) {
@@ -1297,12 +1108,6 @@ class UI {
         document.getElementById('pre-connect').classList.add('active');
         document.getElementById('wallet-address').textContent = '';
         document.getElementById('wallet-balance').textContent = '0 SOL';
-        
-        // Stop auto-refresh
-        if (this.autoRefreshInterval) {
-            clearInterval(this.autoRefreshInterval);
-            this.autoRefreshInterval = null;
-        }
     }
 
     async scanForAccounts() {
@@ -1696,23 +1501,6 @@ class UI {
         // Trigger reflow to ensure animation plays
         announcement.offsetHeight;
         announcement.classList.add('active');
-    }
-
-    // Enhanced method to get UI statistics
-    getUIStats() {
-        return {
-            activeStars: this.activeStars.size,
-            notificationQueue: this.notificationQueue.length,
-            lastRefresh: this.lastRefresh,
-            autoRefreshActive: !!this.autoRefreshInterval
-        };
-    }
-
-    // Method to show connection health status
-    showConnectionStatus() {
-        const status = this.walletManager.getConnectionStatus();
-        const message = `Connection: ${status.health} | Network: ${status.network} | Retries: ${status.retries}`;
-        this.showNotification(message, status.health === 'healthy' ? 'success' : 'warning');
     }
 }
 
