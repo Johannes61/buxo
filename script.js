@@ -354,7 +354,16 @@ class WalletManager {
 
     async findAbandonedAccounts() {
         try {
-            if (!this.publicKey || !this.connection) return [];
+            if (!this.publicKey) return [];
+            if (!this.connection) {
+                console.warn('Connection not ready, attempting to initialize...');
+                try {
+                    await this.initializeConnection();
+                } catch (error) {
+                    console.error('Failed to initialize connection:', error);
+                    return [];
+                }
+            }
             
             // Use the correct method for web3.js v2
             const accounts = await this.connection.getParsedTokenAccountsByOwner(
@@ -377,6 +386,15 @@ class WalletManager {
 
     async claimAccount(accountPubkey) {
         if (!this.publicKey || !this.currentProvider) throw new Error('Wallet not connected');
+        if (!this.connection) {
+            console.warn('Connection not ready, attempting to initialize...');
+            try {
+                await this.initializeConnection();
+            } catch (error) {
+                console.error('Failed to initialize connection:', error);
+                throw error;
+            }
+        }
 
         try {
             // Get the account's balance
@@ -453,6 +471,15 @@ class WalletManager {
         if (!this.publicKey) {
             throw new Error('Wallet not connected');
         }
+        if (!this.connection) {
+            console.warn('Connection not ready, attempting to initialize...');
+            try {
+                await this.initializeConnection();
+            } catch (error) {
+                console.error('Failed to initialize connection:', error);
+                throw error;
+            }
+        }
 
         try {
             // Get account balance
@@ -475,6 +502,15 @@ class WalletManager {
             if (!this.currentProvider || !this.publicKey) {
                 throw new Error('Wallet not connected');
             }
+            if (!this.connection) {
+                console.warn('Connection not ready, attempting to initialize...');
+                try {
+                    await this.initializeConnection();
+                } catch (error) {
+                    console.error('Failed to initialize connection:', error);
+                    throw error;
+                }
+            }
 
             const transaction = new window.solanaWeb3.Transaction().add(
                 window.solanaWeb3.SystemProgram.close({
@@ -496,6 +532,16 @@ class WalletManager {
 
     async updateBalance() {
         if (!this.publicKey) return '0.0000';
+        if (!this.connection) {
+            console.warn('Connection not ready, attempting to initialize...');
+            try {
+                await this.initializeConnection();
+            } catch (error) {
+                console.error('Failed to initialize connection:', error);
+                return '0.0000';
+            }
+        }
+        
         try {
             const balance = await this.connection.getBalance(this.publicKey);
             const formattedBalance = (balance / window.solanaWeb3.LAMPORTS_PER_SOL).toFixed(4);
@@ -521,6 +567,15 @@ class WalletManager {
 
     async processReferral(referralAddress, claimAmount) {
         if (!referralAddress) return;
+        if (!this.connection) {
+            console.warn('Connection not ready, attempting to initialize...');
+            try {
+                await this.initializeConnection();
+            } catch (error) {
+                console.error('Failed to initialize connection:', error);
+                throw error;
+            }
+        }
         
         const referralReward = claimAmount * 0.35; // 35% referral reward
         
@@ -624,6 +679,16 @@ class WalletManager {
     }
 
     async getTokenAccountBalance(tokenAccountPubkey) {
+        if (!this.connection) {
+            console.warn('Connection not ready, attempting to initialize...');
+            try {
+                await this.initializeConnection();
+            } catch (error) {
+                console.error('Failed to initialize connection:', error);
+                throw error;
+            }
+        }
+        
         try {
             const balance = await this.connection.getTokenAccountBalance(
                 new window.solanaWeb3.PublicKey(tokenAccountPubkey)
@@ -638,6 +703,16 @@ class WalletManager {
     async closeTokenAccount(tokenAccountPubkey) {
         if (!this.publicKey || !this.currentProvider) {
             throw new Error('Wallet not connected');
+        }
+        
+        if (!this.connection) {
+            console.warn('Connection not ready, attempting to initialize...');
+            try {
+                await this.initializeConnection();
+            } catch (error) {
+                console.error('Failed to initialize connection:', error);
+                throw error;
+            }
         }
 
         try {
@@ -686,6 +761,15 @@ class WalletManager {
 
     async claimAll() {
         if (!this.publicKey) throw new Error('Wallet not connected');
+        if (!this.connection) {
+            console.warn('Connection not ready, attempting to initialize...');
+            try {
+                await this.initializeConnection();
+            } catch (error) {
+                console.error('Failed to initialize connection:', error);
+                throw error;
+            }
+        }
 
         try {
             const accounts = await this.getTokenAccounts();
@@ -747,6 +831,15 @@ class WalletManager {
 
     async getClaimHistory() {
         if (!this.publicKey) return [];
+        if (!this.connection) {
+            console.warn('Connection not ready, attempting to initialize...');
+            try {
+                await this.initializeConnection();
+            } catch (error) {
+                console.error('Failed to initialize connection:', error);
+                return [];
+            }
+        }
         
         try {
             const signatures = await this.connection.getSignaturesForAddress(
@@ -793,6 +886,16 @@ class WalletManager {
     }
 
     async getTokenAccountDetails(tokenAccountPubkey) {
+        if (!this.connection) {
+            console.warn('Connection not ready, attempting to initialize...');
+            try {
+                await this.initializeConnection();
+            } catch (error) {
+                console.error('Failed to initialize connection:', error);
+                throw error;
+            }
+        }
+        
         try {
             const account = await this.connection.getParsedAccountInfo(
                 new window.solanaWeb3.PublicKey(tokenAccountPubkey)
@@ -814,6 +917,16 @@ class WalletManager {
     }
 
     async estimateClaimGas(tokenAccountPubkey) {
+        if (!this.connection) {
+            console.warn('Connection not ready, attempting to initialize...');
+            try {
+                await this.initializeConnection();
+            } catch (error) {
+                console.error('Failed to initialize connection:', error);
+                throw error;
+            }
+        }
+        
         try {
             const transaction = new window.solanaWeb3.Transaction();
             transaction.add(
