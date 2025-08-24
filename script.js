@@ -176,8 +176,8 @@ class WalletManager {
                 'https://solana-api.projectserum.com'
             ];
 
-            // Show connection status to user
-            this.showConnectionStatus('Connecting to Solana network...', 'info');
+            // Emit connection status event
+            this.emitConnectionStatus('Connecting to Solana network...', 'info');
             console.log(`Attempting to connect to Solana RPC endpoints (attempt ${retryCount + 1}/${maxRetries + 1})...`);
 
             // Try endpoints in parallel for faster connection
@@ -211,19 +211,19 @@ class WalletManager {
             if (successfulConnection) {
                 this.connection = successfulConnection;
                 console.log('🎉 Successfully connected to Solana network!');
-                this.showConnectionStatus('Connected to Solana network!', 'success');
+                this.emitConnectionStatus('Connected to Solana network!', 'success');
                 return;
             }
             
             // If all endpoints fail, try to create a basic connection to devnet as fallback
             try {
                 console.log('🔄 All endpoints failed, trying devnet fallback...');
-                this.showConnectionStatus('Trying devnet fallback...', 'warning');
+                this.emitConnectionStatus('Trying devnet fallback...', 'warning');
                 this.connection = new window.solanaWeb3.Connection('https://api.devnet.solana.com', {
                     commitment: 'confirmed'
                 });
                 console.log('✅ Connected to devnet fallback');
-                this.showConnectionStatus('Connected to devnet (test network)', 'warning');
+                this.emitConnectionStatus('Connected to devnet (test network)', 'warning');
                 return;
             } catch (fallbackError) {
                 console.error('💥 Devnet fallback also failed:', fallbackError);
@@ -234,12 +234,12 @@ class WalletManager {
             if (retryCount < maxRetries) {
                 const delay = baseDelay * Math.pow(2, retryCount); // Exponential backoff
                 console.log(`🔄 Connection failed, retrying in ${delay}ms... (${retryCount + 1}/${maxRetries})`);
-                this.showConnectionStatus(`Connection failed, retrying in ${Math.round(delay/1000)}s...`, 'warning');
+                this.emitConnectionStatus(`Connection failed, retrying in ${Math.round(delay/1000)}s...`, 'warning');
                 await new Promise(resolve => setTimeout(resolve, delay));
                 return this.initializeConnection(retryCount + 1);
             } else {
                 console.error('💥 Max retries reached, giving up');
-                this.showConnectionStatus('Failed to connect to Solana network', 'error');
+                this.emitConnectionStatus('Failed to connect to Solana network', 'error');
                 throw new Error('Unable to connect to Solana network after multiple attempts. This might be due to:\n• Network connectivity issues\n• RPC service outages\n• Firewall restrictions\n\nPlease check your internet connection and try again later.');
             }
         }
@@ -1033,6 +1033,17 @@ class WalletManager {
             return null;
         }
     }
+
+    emitConnectionStatus(message, type = 'info') {
+        // Emit custom event that UI can listen to
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('connectionStatus', {
+                detail: { message, type }
+            }));
+        }
+        // Also log to console
+        console.log(`[${type.toUpperCase()}] ${message}`);
+    }
 }
 
 class UI {
@@ -1115,6 +1126,12 @@ class UI {
 
         // Keyboard shortcuts
         this.setupKeyboardShortcuts();
+        
+        // Listen for connection status events from WalletManager
+        window.addEventListener('connectionStatus', (event) => {
+            const { message, type } = event.detail;
+            this.showNotification(message, type);
+        });
     }
 
     setupKeyboardShortcuts() {
@@ -1822,3 +1839,4 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 });
+dw
