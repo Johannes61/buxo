@@ -46,10 +46,6 @@
         <i class="fas fa-plug"></i>
         <span>Connect Wallet</span>
       </button>
-      <label class="mode-toggle" style="margin-left:1rem;">
-        <input type="checkbox" id="mode-toggle" />
-        <span class="toggle-slider"></span>
-      </label>
     </div>
   </nav>
 
@@ -165,6 +161,18 @@
       </div>
       
       <div class="wallet-options" id="wallet-options">
+      </div>
+      
+      <!-- Enhanced connection status -->
+      <div class="connection-status">
+        <div class="status-item">
+          <span class="status-label">Network:</span>
+          <span class="status-value" id="modal-network">Mainnet</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Status:</span>
+          <span class="status-value" id="modal-status">Ready</span>
+        </div>
       </div>
     </div>
   </div>
