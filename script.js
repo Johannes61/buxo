@@ -1,81 +1,23 @@
-// Global cache notice handler
-function handleCacheNotice() {
-    const notice = document.getElementById('cache-notice');
-    if (notice) {
-        // Auto-remove after 10 seconds
-        setTimeout(() => {
-            if (notice.parentElement) {
-                notice.style.opacity = '0';
-                notice.style.transition = 'opacity 0.5s';
-                setTimeout(() => notice.remove(), 500);
-            }
-        }, 10000);
-        
-        // Add click to refresh functionality
-        notice.addEventListener('click', (e) => {
-            if (e.target.tagName !== 'BUTTON') {
-                window.location.reload(true);
-            }
-        });
-    }
-}
-
-// Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', handleCacheNotice);
-
 class WalletManager {
     constructor() {
-        // Initialize basic properties first
+        // Define TOKEN_PROGRAM_ID
+        this.TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+        
+        // Initialize SPL Token program
+        this.TOKEN_PROGRAM = solanaWeb3.Token;
+        
+        // Use Helius RPC endpoint with API key
+        this.rpcEndpoints = {
+            mainnet: [
+                'https://mainnet.helius-rpc.com/?api-key=2cc2a540-0712-4bd3-aaf8-806470e42cf6',
+                'https://api.mainnet-beta.solana.com'
+            ]
+        };
+        
         this.currentNetwork = 'mainnet';
         this.connection = null;
         this.publicKey = null;
-        this.currentProvider = null;
-        this.rateLimitMap = new Map();
-        
-        this.accountData = {
-            balance: 0,
-            abandonedAccounts: []
-        };
-        this.stats = {
-            activeUsers: Math.floor(Math.random() * 1000) + 5000, // Simulated stats
-            totalClaimed: (Math.random() * 100000).toFixed(2),
-            recentClaims: Math.floor(Math.random() * 100) + 50
-        };
-
-        // Add Buffer polyfill
-        this.Buffer = (function() {
-            if (typeof window !== 'undefined' && window.Buffer) {
-                return window.Buffer;
-            }
-            return {
-                from: (arr) => Uint8Array.from(arr),
-                alloc: (size) => new Uint8Array(size)
-            };
-        })();
-
-        // Defer initialization until solanaWeb3 is available
-        this.initializeWhenReady();
-    }
-
-    async initializeWhenReady() {
-        // Wait for solanaWeb3 to be available
-        let attempts = 0;
-        const maxAttempts = 50; // 5 seconds max wait
-        
-        while (!window.solanaWeb3 && attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            attempts++;
-        }
-        
-        if (!window.solanaWeb3) {
-            console.error('solanaWeb3 not available after waiting');
-            return;
-        }
-
-        // Now initialize the Solana-specific properties
-        this.TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
-        this.TOKEN_PROGRAM = window.solanaWeb3.Token;
-
+        this.initializeConnection();
         this.walletProviders = {
             phantom: {
                 name: 'Phantom',
@@ -144,105 +86,52 @@ class WalletManager {
                 adapter: window?.strike
             }
         };
+        this.currentProvider = null;
+        this.rateLimitMap = new Map();
+        this.accountData = {
+            balance: 0,
+            abandonedAccounts: []
+        };
+        this.stats = {
+            activeUsers: Math.floor(Math.random() * 1000) + 5000, // Simulated stats
+            totalClaimed: (Math.random() * 100000).toFixed(2),
+            recentClaims: Math.floor(Math.random() * 100) + 50
+        };
 
-        // Initialize connection
-        await this.initializeConnection();
-        
-        // Start periodic health checks
-        this.startHealthMonitoring();
+        // Add Buffer polyfill
+        this.Buffer = (function() {
+            if (typeof window !== 'undefined' && window.Buffer) {
+                return window.Buffer;
+            }
+            return {
+                from: (arr) => Uint8Array.from(arr),
+                alloc: (size) => new Uint8Array(size)
+            };
+        })();
     }
 
-    startHealthMonitoring() {
-        // Check connection health every 30 seconds
-        setInterval(async () => {
-            if (this.connection && this.publicKey) {
-                try {
-                    await this.switchToBetterEndpoint();
-                } catch (error) {
-                    console.warn('Health check failed:', error);
-                }
-            }
-        }, 30000);
-    }
+    async initializeConnection() {
+        const fallbackEndpoints = [
+            'https://mainnet.helius-rpc.com/?api-key=2cc2a540-0712-4bd3-aaf8-806470e42cf6',
+            'https://api.mainnet-beta.solana.com',
+            'https://solana-mainnet.g.alchemy.com/v2/your-api-key',
+            'https://rpc.ankr.com/solana'
+        ];
 
-    async initializeConnection(retryCount = 0) {
-        const maxRetries = 3;
-        const baseDelay = 1000; // 1 second
-        
-        try {
-            const fallbackEndpoints = [
-                'https://api.mainnet-beta.solana.com',
-                'https://api.devnet.solana.com',
-                'https://solana-api.projectserum.com'
-            ];
-
-            // Emit connection status event
-            this.emitConnectionStatus('Connecting to Solana network...', 'info');
-            console.log(`Attempting to connect to Solana RPC endpoints (attempt ${retryCount + 1}/${maxRetries + 1})...`);
-
-            // Try endpoints in parallel for faster connection
-            const connectionPromises = fallbackEndpoints.map(async (endpoint, index) => {
-                try {
-                    console.log(`Testing endpoint ${index + 1}: ${endpoint}`);
-                    const connection = new window.solanaWeb3.Connection(endpoint, {
-                        commitment: 'confirmed',
-                        fetch: this.rateLimitedFetch.bind(this)
-                    });
-                    
-                    // Test the connection with a timeout
-                    const testPromise = connection.getLatestBlockhash();
-                    const timeoutPromise = new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error('Timeout')), 10000)
-                    );
-                    
-                    await Promise.race([testPromise, timeoutPromise]);
-                    console.log('✅ Connected to RPC:', endpoint);
-                    return connection;
-                } catch (error) {
-                    console.warn(`❌ Connection failed for endpoint ${index + 1}: ${endpoint}`, error.message);
-                    return null;
-                }
-            });
-
-            // Wait for the first successful connection
-            const connections = await Promise.all(connectionPromises);
-            const successfulConnection = connections.find(conn => conn !== null);
-            
-            if (successfulConnection) {
-                this.connection = successfulConnection;
-                console.log('🎉 Successfully connected to Solana network!');
-                this.emitConnectionStatus('Connected to Solana network!', 'success');
-                return;
-            }
-            
-            // If all endpoints fail, try to create a basic connection to devnet as fallback
+        for (const endpoint of fallbackEndpoints) {
             try {
-                console.log('🔄 All endpoints failed, trying devnet fallback...');
-                this.emitConnectionStatus('Trying devnet fallback...', 'warning');
-                this.connection = new window.solanaWeb3.Connection('https://api.devnet.solana.com', {
-                    commitment: 'confirmed'
+                this.connection = new solanaWeb3.Connection(endpoint, {
+                    commitment: 'confirmed',
+                    wsEndpoint: endpoint.replace('https', 'wss'),
+                    fetch: this.rateLimitedFetch.bind(this)
                 });
-                console.log('✅ Connected to devnet fallback');
-                this.emitConnectionStatus('Connected to devnet (test network)', 'warning');
+                console.log('Connected to RPC:', endpoint);
                 return;
-            } catch (fallbackError) {
-                console.error('💥 Devnet fallback also failed:', fallbackError);
-                throw new Error('All connection attempts failed');
-            }
-            
-        } catch (error) {
-            if (retryCount < maxRetries) {
-                const delay = baseDelay * Math.pow(2, retryCount); // Exponential backoff
-                console.log(`🔄 Connection failed, retrying in ${delay}ms... (${retryCount + 1}/${maxRetries})`);
-                this.emitConnectionStatus(`Connection failed, retrying in ${Math.round(delay/1000)}s...`, 'warning');
-                await new Promise(resolve => setTimeout(resolve, delay));
-                return this.initializeConnection(retryCount + 1);
-            } else {
-                console.error('💥 Max retries reached, giving up');
-                this.emitConnectionStatus('Failed to connect to Solana network', 'error');
-                throw new Error('Unable to connect to Solana network after multiple attempts. This might be due to:\n• Network connectivity issues\n• RPC service outages\n• Firewall restrictions\n\nPlease check your internet connection and try again later.');
+            } catch (error) {
+                console.error('Connection failed for endpoint:', endpoint, error);
             }
         }
+        throw new Error('Failed to connect to any RPC endpoint');
     }
 
     rateLimitedFetch(url, opts) {
@@ -266,54 +155,23 @@ class WalletManager {
         });
     }
 
-    async switchToBetterEndpoint() {
-        if (!this.connection) return;
-        
-        try {
-            // Test current connection speed
-            const startTime = Date.now();
-            await this.connection.getLatestBlockhash();
-            const responseTime = Date.now() - startTime;
-            
-            // If response time is too slow (>3 seconds), try to switch
-            if (responseTime > 3000) {
-                console.log('Current RPC is slow, attempting to switch...');
-                await this.initializeConnection();
-            }
-        } catch (error) {
-            console.log('Current RPC failed, switching to backup...');
-            await this.initializeConnection();
-        }
-    }
-
     async getBalance() {
-        if (!this.publicKey || !this.connection) return '0.0000';
+        if (!this.publicKey) return '0.0000';
 
         try {
             const balance = await this.connection.getBalance(this.publicKey);
             // Format balance to 4 decimal places
-            return (balance / window.solanaWeb3.LAMPORTS_PER_SOL).toFixed(4);
+            return (balance / solanaWeb3.LAMPORTS_PER_SOL).toFixed(4);
         } catch (error) {
             console.error('Error fetching balance:', error);
-            // Try to switch to a better endpoint
+            // Try fallback endpoint
             try {
-                await this.switchToBetterEndpoint();
-                if (this.connection) {
-                    const balance = await this.connection.getBalance(this.publicKey);
-                    return (balance / window.solanaWeb3.LAMPORTS_PER_SOL).toFixed(4);
-                }
-            } catch (switchError) {
-                console.error('Failed to switch endpoints:', switchError);
-            }
-            
-            // Final fallback
-            try {
-                const fallbackRpc = new window.solanaWeb3.Connection(
-                    "https://api.devnet.solana.com",
+                const fallbackRpc = new solanaWeb3.Connection(
+                    "https://solana-mainnet.rpc.extrnode.com",
                     'confirmed'
                 );
                 const fallbackBalance = await fallbackRpc.getBalance(this.publicKey);
-                return (fallbackBalance / window.solanaWeb3.LAMPORTS_PER_SOL).toFixed(4);
+                return (fallbackBalance / solanaWeb3.LAMPORTS_PER_SOL).toFixed(4);
             } catch (fallbackError) {
                 console.error('Fallback balance fetch failed:', fallbackError);
                 return '0.0000';
@@ -414,15 +272,6 @@ class WalletManager {
     async findAbandonedAccounts() {
         try {
             if (!this.publicKey) return [];
-            if (!this.connection) {
-                console.warn('Connection not ready, attempting to initialize...');
-                try {
-                    await this.initializeConnection();
-                } catch (error) {
-                    console.error('Failed to initialize connection:', error);
-                    return [];
-                }
-            }
             
             // Use the correct method for web3.js v2
             const accounts = await this.connection.getParsedTokenAccountsByOwner(
@@ -445,31 +294,22 @@ class WalletManager {
 
     async claimAccount(accountPubkey) {
         if (!this.publicKey || !this.currentProvider) throw new Error('Wallet not connected');
-        if (!this.connection) {
-            console.warn('Connection not ready, attempting to initialize...');
-            try {
-                await this.initializeConnection();
-            } catch (error) {
-                console.error('Failed to initialize connection:', error);
-                throw error;
-            }
-        }
 
         try {
             // Get the account's balance
-            const accountBalance = await this.connection.getBalance(new window.solanaWeb3.PublicKey(accountPubkey));
+            const accountBalance = await this.connection.getBalance(new solanaWeb3.PublicKey(accountPubkey));
             
             // Calculate 5% fee
             const feeAmount = Math.floor(accountBalance * 0.05); // 5% fee
             const userAmount = accountBalance - feeAmount;
             
             // Create transaction with two instructions
-            const transaction = new window.solanaWeb3.Transaction();
+            const transaction = new solanaWeb3.Transaction();
             
             // 1. Transfer 95% to user
             transaction.add(
-                window.solanaWeb3.SystemProgram.transfer({
-                    fromPubkey: new window.solanaWeb3.PublicKey(accountPubkey),
+                solanaWeb3.SystemProgram.transfer({
+                    fromPubkey: new solanaWeb3.PublicKey(accountPubkey),
                     toPubkey: this.publicKey,
                     lamports: userAmount
                 })
@@ -477,9 +317,9 @@ class WalletManager {
             
             // 2. Transfer 5% fee to fee wallet
             transaction.add(
-                window.solanaWeb3.SystemProgram.transfer({
-                    fromPubkey: new window.solanaWeb3.PublicKey(accountPubkey),
-                    toPubkey: new window.solanaWeb3.PublicKey('7XYCEd1xUAkrHQt9kv4PpzXw3CSQjtGyp7DnmpveeVqs'),
+                solanaWeb3.SystemProgram.transfer({
+                    fromPubkey: new solanaWeb3.PublicKey(accountPubkey),
+                    toPubkey: new solanaWeb3.PublicKey('7XYCEd1xUAkrHQt9kv4PpzXw3CSQjtGyp7DnmpveeVqs'),
                     lamports: feeAmount
                 })
             );
@@ -530,15 +370,6 @@ class WalletManager {
         if (!this.publicKey) {
             throw new Error('Wallet not connected');
         }
-        if (!this.connection) {
-            console.warn('Connection not ready, attempting to initialize...');
-            try {
-                await this.initializeConnection();
-            } catch (error) {
-                console.error('Failed to initialize connection:', error);
-                throw error;
-            }
-        }
 
         try {
             // Get account balance
@@ -561,19 +392,10 @@ class WalletManager {
             if (!this.currentProvider || !this.publicKey) {
                 throw new Error('Wallet not connected');
             }
-            if (!this.connection) {
-                console.warn('Connection not ready, attempting to initialize...');
-                try {
-                    await this.initializeConnection();
-                } catch (error) {
-                    console.error('Failed to initialize connection:', error);
-                    throw error;
-                }
-            }
 
-            const transaction = new window.solanaWeb3.Transaction().add(
-                window.solanaWeb3.SystemProgram.close({
-                    fromPubkey: new window.solanaWeb3.PublicKey(pubkey),
+            const transaction = new solanaWeb3.Transaction().add(
+                solanaWeb3.SystemProgram.close({
+                    fromPubkey: new solanaWeb3.PublicKey(pubkey),
                     toPubkey: this.publicKey,
                     lamports: 0 // Will close entire account
                 })
@@ -591,19 +413,9 @@ class WalletManager {
 
     async updateBalance() {
         if (!this.publicKey) return '0.0000';
-        if (!this.connection) {
-            console.warn('Connection not ready, attempting to initialize...');
-            try {
-                await this.initializeConnection();
-            } catch (error) {
-                console.error('Failed to initialize connection:', error);
-                return '0.0000';
-            }
-        }
-        
         try {
             const balance = await this.connection.getBalance(this.publicKey);
-            const formattedBalance = (balance / window.solanaWeb3.LAMPORTS_PER_SOL).toFixed(4);
+            const formattedBalance = (balance / solanaWeb3.LAMPORTS_PER_SOL).toFixed(4);
             // Update the balance display
             const walletInfo = document.getElementById('wallet-info');
             const walletBalance = document.getElementById('wallet-balance');
@@ -626,26 +438,17 @@ class WalletManager {
 
     async processReferral(referralAddress, claimAmount) {
         if (!referralAddress) return;
-        if (!this.connection) {
-            console.warn('Connection not ready, attempting to initialize...');
-            try {
-                await this.initializeConnection();
-            } catch (error) {
-                console.error('Failed to initialize connection:', error);
-                throw error;
-            }
-        }
         
         const referralReward = claimAmount * 0.35; // 35% referral reward
         
         try {
             // Here you would implement the logic to transfer the referral reward
             // This is a simplified example
-            const transaction = new window.solanaWeb3.Transaction().add(
-                window.solanaWeb3.SystemProgram.transfer({
+            const transaction = new solanaWeb3.Transaction().add(
+                solanaWeb3.SystemProgram.transfer({
                     fromPubkey: this.publicKey,
-                    toPubkey: new window.solanaWeb3.PublicKey(referralAddress),
-                    lamports: referralReward * window.solanaWeb3.LAMPORTS_PER_SOL
+                    toPubkey: new solanaWeb3.PublicKey(referralAddress),
+                    lamports: referralReward * solanaWeb3.LAMPORTS_PER_SOL
                 })
             );
 
@@ -661,15 +464,6 @@ class WalletManager {
 
     async getAbandonedAccounts() {
         if (!this.publicKey) return [];
-        if (!this.connection) {
-            console.warn('Connection not ready, attempting to initialize...');
-            try {
-                await this.initializeConnection();
-            } catch (error) {
-                console.error('Failed to initialize connection:', error);
-                return [];
-            }
-        }
         
         try {
             const accounts = await this.connection.getParsedTokenAccountsByOwner(
@@ -706,15 +500,6 @@ class WalletManager {
 
     async getTokenAccounts() {
         if (!this.publicKey) return [];
-        if (!this.connection) {
-            console.warn('Connection not ready, attempting to initialize...');
-            try {
-                await this.initializeConnection();
-            } catch (error) {
-                console.error('Failed to initialize connection:', error);
-                return [];
-            }
-        }
         
         try {
             const accounts = await this.connection.getParsedTokenAccountsByOwner(
@@ -738,19 +523,9 @@ class WalletManager {
     }
 
     async getTokenAccountBalance(tokenAccountPubkey) {
-        if (!this.connection) {
-            console.warn('Connection not ready, attempting to initialize...');
-            try {
-                await this.initializeConnection();
-            } catch (error) {
-                console.error('Failed to initialize connection:', error);
-                throw error;
-            }
-        }
-        
         try {
             const balance = await this.connection.getTokenAccountBalance(
-                new window.solanaWeb3.PublicKey(tokenAccountPubkey)
+                new solanaWeb3.PublicKey(tokenAccountPubkey)
             );
             return balance.value;
         } catch (error) {
@@ -763,25 +538,15 @@ class WalletManager {
         if (!this.publicKey || !this.currentProvider) {
             throw new Error('Wallet not connected');
         }
-        
-        if (!this.connection) {
-            console.warn('Connection not ready, attempting to initialize...');
-            try {
-                await this.initializeConnection();
-            } catch (error) {
-                console.error('Failed to initialize connection:', error);
-                throw error;
-            }
-        }
 
         try {
             // Create the transaction
-            const transaction = new window.solanaWeb3.Transaction();
+            const transaction = new solanaWeb3.Transaction();
             
             // Create close account instruction
-            const instruction = new window.solanaWeb3.TransactionInstruction({
+            const instruction = new solanaWeb3.TransactionInstruction({
                 keys: [
-                    { pubkey: new window.solanaWeb3.PublicKey(tokenAccountPubkey), isSigner: false, isWritable: true },
+                    { pubkey: new solanaWeb3.PublicKey(tokenAccountPubkey), isSigner: false, isWritable: true },
                     { pubkey: this.publicKey, isSigner: true, isWritable: true },
                     { pubkey: this.publicKey, isSigner: false, isWritable: true },
                     { pubkey: this.TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
@@ -820,15 +585,6 @@ class WalletManager {
 
     async claimAll() {
         if (!this.publicKey) throw new Error('Wallet not connected');
-        if (!this.connection) {
-            console.warn('Connection not ready, attempting to initialize...');
-            try {
-                await this.initializeConnection();
-            } catch (error) {
-                console.error('Failed to initialize connection:', error);
-                throw error;
-            }
-        }
 
         try {
             const accounts = await this.getTokenAccounts();
@@ -840,19 +596,19 @@ class WalletManager {
             for (const account of emptyAccounts) {
                 try {
                     // Get account balance before closing
-                    const balance = await this.connection.getBalance(new window.solanaWeb3.PublicKey(account.pubkey));
+                    const balance = await this.connection.getBalance(new solanaWeb3.PublicKey(account.pubkey));
                     
                     // Calculate fee and user amounts
                     const feeAmount = Math.floor(balance * 0.05); // 5% fee
                     const userAmount = balance - feeAmount;
                     
                     // Create transaction with fee split
-                    const transaction = new window.solanaWeb3.Transaction();
+                    const transaction = new solanaWeb3.Transaction();
                     
                     // Transfer 95% to user
                     transaction.add(
-                        window.solanaWeb3.SystemProgram.transfer({
-                            fromPubkey: new window.solanaWeb3.PublicKey(account.pubkey),
+                        solanaWeb3.SystemProgram.transfer({
+                            fromPubkey: new solanaWeb3.PublicKey(account.pubkey),
                             toPubkey: this.publicKey,
                             lamports: userAmount
                         })
@@ -860,9 +616,9 @@ class WalletManager {
                     
                     // Transfer 5% fee
                     transaction.add(
-                        window.solanaWeb3.SystemProgram.transfer({
-                            fromPubkey: new window.solanaWeb3.PublicKey(account.pubkey),
-                            toPubkey: new window.solanaWeb3.PublicKey('7XYCEd1xUAkrHQt9kv4PpzXw3CSQjtGyp7DnmpveeVqs'),
+                        solanaWeb3.SystemProgram.transfer({
+                            fromPubkey: new solanaWeb3.PublicKey(account.pubkey),
+                            toPubkey: new solanaWeb3.PublicKey('7XYCEd1xUAkrHQt9kv4PpzXw3CSQjtGyp7DnmpveeVqs'),
                             lamports: feeAmount
                         })
                     );
@@ -871,7 +627,7 @@ class WalletManager {
                     await this.connection.confirmTransaction(signature);
                     signatures.push(signature);
                     
-                    totalClaimed += userAmount / window.solanaWeb3.LAMPORTS_PER_SOL;
+                    totalClaimed += userAmount / solanaWeb3.LAMPORTS_PER_SOL;
                 } catch (err) {
                     console.error(`Failed to close account ${account.pubkey}:`, err);
                 }
@@ -890,15 +646,6 @@ class WalletManager {
 
     async getClaimHistory() {
         if (!this.publicKey) return [];
-        if (!this.connection) {
-            console.warn('Connection not ready, attempting to initialize...');
-            try {
-                await this.initializeConnection();
-            } catch (error) {
-                console.error('Failed to initialize connection:', error);
-                return [];
-            }
-        }
         
         try {
             const signatures = await this.connection.getSignaturesForAddress(
@@ -945,22 +692,12 @@ class WalletManager {
     }
 
     async getTokenAccountDetails(tokenAccountPubkey) {
-        if (!this.connection) {
-            console.warn('Connection not ready, attempting to initialize...');
-            try {
-                await this.initializeConnection();
-            } catch (error) {
-                console.error('Failed to initialize connection:', error);
-                throw error;
-            }
-        }
-        
         try {
             const account = await this.connection.getParsedAccountInfo(
-                new window.solanaWeb3.PublicKey(tokenAccountPubkey)
+                new solanaWeb3.PublicKey(tokenAccountPubkey)
             );
             const mintInfo = await this.connection.getParsedAccountInfo(
-                new window.solanaWeb3.PublicKey(account.data.parsed.info.mint)
+                new solanaWeb3.PublicKey(account.data.parsed.info.mint)
             );
             return {
                 mint: account.data.parsed.info.mint,
@@ -976,22 +713,12 @@ class WalletManager {
     }
 
     async estimateClaimGas(tokenAccountPubkey) {
-        if (!this.connection) {
-            console.warn('Connection not ready, attempting to initialize...');
-            try {
-                await this.initializeConnection();
-            } catch (error) {
-                console.error('Failed to initialize connection:', error);
-                throw error;
-            }
-        }
-        
         try {
-            const transaction = new window.solanaWeb3.Transaction();
+            const transaction = new solanaWeb3.Transaction();
             transaction.add(
-                new window.solanaWeb3.TransactionInstruction({
+                new solanaWeb3.TransactionInstruction({
                     keys: [
-                        { pubkey: new window.solanaWeb3.PublicKey(tokenAccountPubkey), isSigner: false, isWritable: true },
+                        { pubkey: new solanaWeb3.PublicKey(tokenAccountPubkey), isSigner: false, isWritable: true },
                         { pubkey: this.publicKey, isSigner: true, isWritable: true },
                         { pubkey: this.publicKey, isSigner: false, isWritable: true },
                         { pubkey: this.TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
@@ -1023,26 +750,15 @@ class WalletManager {
             
             return {
                 totalAccounts: accounts.length,
-                totalValueSOL: totalValue / window.solanaWeb3.LAMPORTS_PER_SOL,
-                averageValueSOL: (totalValue / accounts.length) / window.solanaWeb3.LAMPORTS_PER_SOL,
+                totalValueSOL: totalValue / solanaWeb3.LAMPORTS_PER_SOL,
+                averageValueSOL: (totalValue / accounts.length) / solanaWeb3.LAMPORTS_PER_SOL,
                 oldestAccountAge: Math.floor((Date.now() - oldestAccount) / (1000 * 60 * 60 * 24)),
-                potentialSavings: totalValue / window.solanaWeb3.LAMPORTS_PER_SOL
+                potentialSavings: totalValue / solanaWeb3.LAMPORTS_PER_SOL
             };
         } catch (error) {
             console.error('Error getting analytics:', error);
             return null;
         }
-    }
-
-    emitConnectionStatus(message, type = 'info') {
-        // Emit custom event that UI can listen to
-        if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('connectionStatus', {
-                detail: { message, type }
-            }));
-        }
-        // Also log to console
-        console.log(`[${type.toUpperCase()}] ${message}`);
     }
 }
 
@@ -1104,122 +820,6 @@ class UI {
         const claimAllButton = document.getElementById('claim-all');
         if (claimAllButton) {
             claimAllButton.addEventListener('click', () => this.claimAll());
-        }
-
-        // Enhanced refresh button
-        const refreshButton = document.getElementById('refresh-accounts');
-        if (refreshButton) {
-            refreshButton.addEventListener('click', () => this.refreshAccounts());
-        }
-
-        // Copy referral link
-        const copyReferralButton = document.getElementById('copy-referral');
-        if (copyReferralButton) {
-            copyReferralButton.addEventListener('click', () => this.copyReferralLink());
-        }
-
-        // Enhanced search functionality
-        const walletSearch = document.getElementById('wallet-search');
-        if (walletSearch) {
-            walletSearch.addEventListener('input', (e) => this.filterWallets(e.target.value));
-        }
-
-        // Keyboard shortcuts
-        this.setupKeyboardShortcuts();
-        
-        // Listen for connection status events from WalletManager
-        window.addEventListener('connectionStatus', (event) => {
-            const { message, type } = event.detail;
-            this.showNotification(message, type);
-        });
-    }
-
-    setupKeyboardShortcuts() {
-        document.addEventListener('keydown', (e) => {
-            // Ctrl/Cmd + R to refresh
-            if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
-                e.preventDefault();
-                this.refreshAccounts();
-            }
-            
-            // Escape to close modals
-            if (e.key === 'Escape') {
-                const modal = document.getElementById('wallet-modal-overlay');
-                if (modal && modal.classList.contains('show')) {
-                    modal.classList.remove('show');
-                }
-            }
-        });
-    }
-
-    async refreshAccounts() {
-        let refreshBtn = null;
-        try {
-            this.showLoading('Refreshing accounts...');
-            
-            // Update refresh button with loading state
-            refreshBtn = document.getElementById('refresh-accounts');
-            if (refreshBtn) {
-                refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-                refreshBtn.disabled = true;
-            }
-
-            await this.scanForAccounts();
-            await this.updateWalletInfo();
-            
-            this.showNotification('Accounts refreshed successfully!', 'success');
-        } catch (error) {
-            this.showNotification('Failed to refresh accounts', 'error');
-        } finally {
-            this.hideLoading();
-            
-            // Reset refresh button
-            if (refreshBtn) {
-                refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
-                refreshBtn.disabled = false;
-            }
-        }
-    }
-
-    filterWallets(searchTerm) {
-        const walletOptions = document.querySelectorAll('.wallet-option');
-        const searchLower = searchTerm.toLowerCase();
-        
-        walletOptions.forEach(option => {
-            const walletName = option.querySelector('.wallet-name')?.textContent.toLowerCase() || '';
-            const isVisible = walletName.includes(searchLower);
-            option.style.display = isVisible ? 'flex' : 'none';
-            
-            // Add highlight effect for search matches
-            if (searchTerm && isVisible) {
-                option.classList.add('search-highlight');
-            } else {
-                option.classList.remove('search-highlight');
-            }
-        });
-    }
-
-    copyReferralLink() {
-        const referralLink = document.getElementById('referral-link');
-        if (referralLink && referralLink.value) {
-            navigator.clipboard.writeText(referralLink.value).then(() => {
-                this.showNotification('Referral link copied to clipboard!', 'success');
-                
-                // Visual feedback
-                const copyBtn = document.getElementById('copy-referral');
-                if (copyBtn) {
-                    const originalText = copyBtn.innerHTML;
-                    copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-                    copyBtn.style.background = '#10B981';
-                    
-                    setTimeout(() => {
-                        copyBtn.innerHTML = originalText;
-                        copyBtn.style.background = '';
-                    }, 2000);
-                }
-            }).catch(() => {
-                this.showNotification('Failed to copy link', 'error');
-            });
         }
     }
 
@@ -1341,23 +941,15 @@ class UI {
             <div class="toast-content">
                 <p>${message}</p>
             </div>
-            <button class="toast-close" onclick="this.parentElement.remove()">
-                <i class="fas fa-times"></i>
-            </button>
         `;
         
         const container = document.querySelector('.toast-container');
-        if (container) {
-            container.appendChild(toast);
-            
-            // Auto-remove after 4 seconds
-            setTimeout(() => {
-                if (toast.parentElement) {
-                    toast.classList.add('slide-out');
-                    setTimeout(() => toast.remove(), 300);
-                }
-            }, 4000);
-        }
+        container.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.classList.add('slide-out');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
     }
 
     getNotificationIcon(type) {
@@ -1408,20 +1000,20 @@ class UI {
 
         // Calculate total amount of SOL that can be reclaimed
         const totalAmount = accounts.reduce((sum, account) => 
-            sum + (account.rentExemptReserve / window.solanaWeb3.LAMPORTS_PER_SOL), 0);
+            sum + (account.rentExemptReserve / solanaWeb3.LAMPORTS_PER_SOL), 0);
         
         if (totalAmountSpan) {
             totalAmountSpan.textContent = totalAmount.toFixed(4);
         }
 
-        accountsList.innerHTML = accounts.map((account, index) => `
-            <div class="abandoned-account" style="animation-delay: ${index * 0.1}s">
+        accountsList.innerHTML = accounts.map(account => `
+            <div class="abandoned-account">
                 <div class="account-info">
                     <div class="account-address">
                         ${account.pubkey.toString().slice(0, 4)}...${account.pubkey.toString().slice(-4)}
                     </div>
                     <div class="account-balance">
-                        ${(account.rentExemptReserve / window.solanaWeb3.LAMPORTS_PER_SOL).toFixed(4)} SOL
+                        ${(account.rentExemptReserve / solanaWeb3.LAMPORTS_PER_SOL).toFixed(4)} SOL
                     </div>
                 </div>
                 <button class="btn-claim" onclick="ui.claimAccount('${account.pubkey}')">
@@ -1445,7 +1037,7 @@ class UI {
             for (const account of accounts) {
                 try {
                     await this.claimAccount(account.pubkey);
-                    totalClaimed += account.account.lamports / window.solanaWeb3.LAMPORTS_PER_SOL;
+                    totalClaimed += account.account.lamports / solanaWeb3.LAMPORTS_PER_SOL;
                 } catch (error) {
                     console.error(`Error claiming account ${account.pubkey}:`, error);
                 }
@@ -1702,8 +1294,8 @@ class UI {
             this.showLoading('Claiming account...');
             
             // Get account info before closing
-            const account = await this.walletManager.connection.getAccountInfo(new window.solanaWeb3.PublicKey(pubkey));
-            const claimAmount = account.lamports / window.solanaWeb3.LAMPORTS_PER_SOL;
+            const account = await this.walletManager.connection.getAccountInfo(new solanaWeb3.PublicKey(pubkey));
+            const claimAmount = account.lamports / solanaWeb3.LAMPORTS_PER_SOL;
 
             // Close the account
             const result = await this.walletManager.closeTokenAccount(pubkey);
@@ -1771,16 +1363,6 @@ class UI {
         announcement.offsetHeight;
         announcement.classList.add('active');
     }
-
-    showConnectionStatus(message, type = 'info') {
-        // Try to show notification if UI is available
-        if (typeof this.showNotification === 'function') {
-            this.showNotification(message, type);
-        } else {
-            // Fallback to console
-            console.log(`[${type.toUpperCase()}] ${message}`);
-        }
-    }
 }
 
 // Initialize the application
@@ -1839,4 +1421,3 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 });
-dw
