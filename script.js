@@ -676,7 +676,7 @@ class WalletManager {
         const results = [];
         for (let i = 0; i < accounts.length; i += batchSize) {
             const batch = accounts.slice(i, i + batchSize);
-            const batchPromises = batch.map(account => 
+            const batchPromises = batch.map account => 
                 this.closeTokenAccount(account.pubkey)
                     .then(signature => ({ success: true, signature, pubkey: account.pubkey }))
                     .catch(error => ({ success: false, error, pubkey: account.pubkey }))
@@ -821,6 +821,20 @@ class UI {
         if (claimAllButton) {
             claimAllButton.addEventListener('click', () => this.claimAll());
         }
+
+        document.getElementById('copy-referral')?.addEventListener('click', () => {
+            const input = document.getElementById('referral-link');
+            if (input) {
+                input.select();
+                document.execCommand('copy');
+                this.showNotification('Referral link copied!', 'success');
+            }
+        });
+
+        document.getElementById('refresh-accounts')?.addEventListener('click', () => {
+            this.scanForAccounts();
+            this.showNotification('Refreshing abandoned accounts...', 'info');
+        });
     }
 
     async handleWalletConnection(providerId) {
@@ -972,6 +986,15 @@ class UI {
     }
 
     async scanForAccounts() {
+        const accountsList = document.getElementById('abandoned-accounts');
+        if (accountsList) {
+            accountsList.innerHTML = `
+                <div class="scanning-status">
+                    <span>Scanning for abandoned accounts</span>
+                    <span class="scanning-dot"></span>
+                </div>
+            `;
+        }
         try {
             const accounts = await this.walletManager.getAbandonedAccounts();
             this.updateAbandonedAccounts(accounts);
@@ -1001,10 +1024,7 @@ class UI {
         // Calculate total amount of SOL that can be reclaimed
         const totalAmount = accounts.reduce((sum, account) => 
             sum + (account.rentExemptReserve / solanaWeb3.LAMPORTS_PER_SOL), 0);
-        
-        if (totalAmountSpan) {
-            totalAmountSpan.textContent = totalAmount.toFixed(4);
-        }
+        if (totalAmountSpan) totalAmountSpan.textContent = totalAmount.toFixed(4);
 
         accountsList.innerHTML = accounts.map(account => `
             <div class="abandoned-account">
@@ -1307,6 +1327,11 @@ class UI {
             }
 
             this.showNotification(`Account closed successfully! Claimed ${claimAmount} SOL`, 'success');
+            // Show check animation
+            const accountsList = document.getElementById('abandoned-accounts');
+            if (accountsList) {
+                accountsList.innerHTML = `<div class="success-check"><i class="fas fa-check-circle"></i></div>`;
+            }
             await this.scanForAccounts();
             await this.updateWalletInfo();
         } catch (error) {
@@ -1318,17 +1343,16 @@ class UI {
 
     async updateWalletInfo() {
         const connectButton = document.getElementById('wallet-connect');
-        if (connectButton && this.walletManager.publicKey) {
+        const walletInfo = document.getElementById('wallet-info');
+        const walletAddressSpan = document.getElementById('wallet-address');
+        const walletBalanceSpan = document.getElementById('wallet-balance');
+        if (this.walletManager.publicKey) {
             const walletAddress = this.walletManager.publicKey.toString();
             const balance = await this.walletManager.getBalance();
-            
-            connectButton.innerHTML = `
-                <div class="wallet-info">
-                    <span class="wallet-address">${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}</span>
-                    <span class="wallet-balance">${balance} SOL</span>
-                </div>
-            `;
-            connectButton.classList.add('connected');
+            if (connectButton) connectButton.classList.add('connected');
+            if (walletInfo) walletInfo.classList.remove('hidden');
+            if (walletAddressSpan) walletAddressSpan.textContent = walletAddress.slice(0, 4) + '...' + walletAddress.slice(-4);
+            if (walletBalanceSpan) walletBalanceSpan.textContent = `${balance} SOL`;
         }
     }
 

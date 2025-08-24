@@ -249,6 +249,28 @@
     opacity: 0.8;
 }
 
+/* Scanning Status Styling */
+.scanning-status {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    font-size: 1.1rem;
+    color: var(--primary-color);
+    font-weight: 500;
+}
+.scanning-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    animation: scanning-dot 1s infinite alternate;
+}
+@keyframes scanning-dot {
+    0% { opacity: 0.2; }
+    100% { opacity: 1; }
+}
+
 /* Responsive Adjustments */
 @media (max-width: 1400px) {
     .dashboard-container {
@@ -892,6 +914,21 @@ main {
     }
 }
 
+@media (max-width: 900px) {
+    .dashboard-container {
+        flex-direction: column;
+        gap: 2rem;
+        width: 100%;
+        padding: 0 1rem;
+        height: auto;
+    }
+    .abandoned-accounts, .referral-section {
+        min-width: 0;
+        width: 100%;
+        padding: 1.2rem;
+    }
+}
+
 /* Utility Classes */
 .hidden {
     display: none !important;
@@ -1057,7 +1094,7 @@ main {
     display: none;
 }
 
-#hero-connect.hidden {
+#hero_connect.hidden {
     display: none;
 }
 
@@ -1385,6 +1422,44 @@ main {
     color: var(--primary-color);
 }
 
+/* Mode Toggle Switch */
+.mode-toggle {
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    position: relative;
+}
+.mode-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #ccc;
+    border-radius: 24px;
+    transition: background 0.3s;
+}
+.toggle-slider:before {
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    width: 16px;
+    height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.3s;
+}
+.mode-toggle input:checked + .toggle-slider {
+    background: var(--primary-color);
+}
+.mode-toggle input:checked + .toggle-slider:before {
+    transform: translateX(20px);
+}
+
 /* Style all font awesome icons */
 .fa {
     padding: 20px;
@@ -1455,4 +1530,42 @@ nav {
 /* Adjust main content to account for banner */
 main {
     margin-top: 32px;
+}
+
+/* Loading Overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(255,255,255,0.7);
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.3s;
+}
+
+.loader-spinner {
+    border: 4px solid #eee;
+    border-top: 4px solid var(--primary-color);
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.success-check {
+    color: var(--primary-color);
+    font-size: 3rem;
+    animation: pop-in 0.5s;
+    text-align: center;
+    margin: 2rem 0;
+}
+@keyframes pop-in {
+    0% { transform: scale(0.5); opacity: 0; }
+    80% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1); }
 }
