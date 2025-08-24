@@ -140,50 +140,84 @@ class WalletManager {
         }, 30000);
     }
 
-    async initializeConnection() {
-        const fallbackEndpoints = [
-            'https://api.mainnet-beta.solana.com',
-            'https://solana-mainnet.rpc.extrnode.com',
-            'https://rpc.ankr.com/solana',
-            'https://solana.public-rpc.com',
-            'https://solana-api.projectserum.com',
-            'https://mainnet.rpc.solana.com',
-            'https://solana.public-rpc.com'
-        ];
+    async initializeConnection(retryCount = 0) {
+        const maxRetries = 3;
+        const baseDelay = 1000; // 1 second
+        
+        try {
+            const fallbackEndpoints = [
+                'https://api.mainnet-beta.solana.com',
+                'https://api.devnet.solana.com',
+                'https://solana-api.projectserum.com'
+            ];
 
-        // Try endpoints in parallel for faster connection
-        const connectionPromises = fallbackEndpoints.map(async (endpoint) => {
-            try {
-                const connection = new window.solanaWeb3.Connection(endpoint, {
-                    commitment: 'confirmed',
-                    fetch: this.rateLimitedFetch.bind(this)
-                });
-                
-                // Test the connection with a timeout
-                const testPromise = connection.getLatestBlockhash();
-                const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Timeout')), 5000)
-                );
-                
-                await Promise.race([testPromise, timeoutPromise]);
-                console.log('Connected to RPC:', endpoint);
-                return connection;
-            } catch (error) {
-                console.error('Connection failed for endpoint:', endpoint, error);
-                return null;
+            // Show connection status to user
+            this.showConnectionStatus('Connecting to Solana network...', 'info');
+            console.log(`Attempting to connect to Solana RPC endpoints (attempt ${retryCount + 1}/${maxRetries + 1})...`);
+
+            // Try endpoints in parallel for faster connection
+            const connectionPromises = fallbackEndpoints.map(async (endpoint, index) => {
+                try {
+                    console.log(`Testing endpoint ${index + 1}: ${endpoint}`);
+                    const connection = new window.solanaWeb3.Connection(endpoint, {
+                        commitment: 'confirmed',
+                        fetch: this.rateLimitedFetch.bind(this)
+                    });
+                    
+                    // Test the connection with a timeout
+                    const testPromise = connection.getLatestBlockhash();
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Timeout')), 10000)
+                    );
+                    
+                    await Promise.race([testPromise, timeoutPromise]);
+                    console.log('✅ Connected to RPC:', endpoint);
+                    return connection;
+                } catch (error) {
+                    console.warn(`❌ Connection failed for endpoint ${index + 1}: ${endpoint}`, error.message);
+                    return null;
+                }
+            });
+
+            // Wait for the first successful connection
+            const connections = await Promise.all(connectionPromises);
+            const successfulConnection = connections.find(conn => conn !== null);
+            
+            if (successfulConnection) {
+                this.connection = successfulConnection;
+                console.log('🎉 Successfully connected to Solana network!');
+                this.showConnectionStatus('Connected to Solana network!', 'success');
+                return;
             }
-        });
-
-        // Wait for the first successful connection
-        const connections = await Promise.all(connectionPromises);
-        const successfulConnection = connections.find(conn => conn !== null);
-        
-        if (successfulConnection) {
-            this.connection = successfulConnection;
-            return;
+            
+            // If all endpoints fail, try to create a basic connection to devnet as fallback
+            try {
+                console.log('🔄 All endpoints failed, trying devnet fallback...');
+                this.showConnectionStatus('Trying devnet fallback...', 'warning');
+                this.connection = new window.solanaWeb3.Connection('https://api.devnet.solana.com', {
+                    commitment: 'confirmed'
+                });
+                console.log('✅ Connected to devnet fallback');
+                this.showConnectionStatus('Connected to devnet (test network)', 'warning');
+                return;
+            } catch (fallbackError) {
+                console.error('💥 Devnet fallback also failed:', fallbackError);
+                throw new Error('All connection attempts failed');
+            }
+            
+        } catch (error) {
+            if (retryCount < maxRetries) {
+                const delay = baseDelay * Math.pow(2, retryCount); // Exponential backoff
+                console.log(`🔄 Connection failed, retrying in ${delay}ms... (${retryCount + 1}/${maxRetries})`);
+                this.showConnectionStatus(`Connection failed, retrying in ${Math.round(delay/1000)}s...`, 'warning');
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return this.initializeConnection(retryCount + 1);
+            } else {
+                console.error('💥 Max retries reached, giving up');
+                this.showConnectionStatus('Failed to connect to Solana network', 'error');
+                throw new Error('Unable to connect to Solana network after multiple attempts. This might be due to:\n• Network connectivity issues\n• RPC service outages\n• Firewall restrictions\n\nPlease check your internet connection and try again later.');
+            }
         }
-        
-        throw new Error('Failed to connect to any RPC endpoint');
     }
 
     rateLimitedFetch(url, opts) {
@@ -250,7 +284,7 @@ class WalletManager {
             // Final fallback
             try {
                 const fallbackRpc = new window.solanaWeb3.Connection(
-                    "https://solana.public-rpc.com",
+                    "https://api.devnet.solana.com",
                     'confirmed'
                 );
                 const fallbackBalance = await fallbackRpc.getBalance(this.publicKey);
@@ -1694,6 +1728,16 @@ class UI {
         // Trigger reflow to ensure animation plays
         announcement.offsetHeight;
         announcement.classList.add('active');
+    }
+
+    showConnectionStatus(message, type = 'info') {
+        // Try to show notification if UI is available
+        if (typeof this.showNotification === 'function') {
+            this.showNotification(message, type);
+        } else {
+            // Fallback to console
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
     }
 }
 
