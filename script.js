@@ -1,10 +1,60 @@
 class WalletManager {
     constructor() {
-        // Define TOKEN_PROGRAM_ID
-        this.TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+        // Initialize basic properties first
+        this.currentNetwork = 'mainnet';
+        this.connection = null;
+        this.publicKey = null;
+        this.currentProvider = null;
+        this.rateLimitMap = new Map();
+        this.connectionRetries = 0;
+        this.maxRetries = 3;
+        this.healthCheckInterval = null;
+        this.lastHealthCheck = 0;
+        this.connectionHealth = 'healthy';
         
-        // Initialize SPL Token program
-        this.TOKEN_PROGRAM = solanaWeb3.Token;
+        this.accountData = {
+            balance: 0,
+            abandonedAccounts: []
+        };
+        this.stats = {
+            activeUsers: Math.floor(Math.random() * 1000) + 5000, // Simulated stats
+            totalClaimed: (Math.random() * 100000).toFixed(2),
+            recentClaims: Math.floor(Math.random() * 100) + 50
+        };
+
+        // Add Buffer polyfill
+        this.Buffer = (function() {
+            if (typeof window !== 'undefined' && window.Buffer) {
+                return window.Buffer;
+            }
+            return {
+                from: (arr) => Uint8Array.from(arr),
+                alloc: (size) => new Uint8Array(size)
+            };
+        })();
+
+        // Defer initialization until solanaWeb3 is available
+        this.initializeWhenReady();
+    }
+
+    async initializeWhenReady() {
+        // Wait for solanaWeb3 to be available
+        let attempts = 0;
+        const maxAttempts = 50; // 5 seconds max wait
+        
+        while (!window.solanaWeb3 && attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
+        }
+        
+        if (!window.solanaWeb3) {
+            console.error('solanaWeb3 not available after waiting');
+            return;
+        }
+
+        // Now initialize the Solana-specific properties
+        this.TOKEN_PROGRAM_ID = new window.solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+        this.TOKEN_PROGRAM = window.solanaWeb3.Token;
         
         // Use Helius RPC endpoint with API key
         this.rpcEndpoints = {
@@ -13,11 +63,7 @@ class WalletManager {
                 'https://api.mainnet-beta.solana.com'
             ]
         };
-        
-        this.currentNetwork = 'mainnet';
-        this.connection = null;
-        this.publicKey = null;
-        this.initializeConnection();
+
         this.walletProviders = {
             phantom: {
                 name: 'Phantom',
@@ -86,69 +132,10 @@ class WalletManager {
                 adapter: window?.strike
             }
         };
-        this.currentProvider = null;
-        this.rateLimitMap = new Map();
-        this.accountData = {
-            balance: 0,
-            abandonedAccounts: []
-        };
-        this.stats = {
-            activeUsers: Math.floor(Math.random() * 1000) + 5000, // Simulated stats
-            totalClaimed: (Math.random() * 100000).toFixed(2),
-            recentClaims: Math.floor(Math.random() * 100) + 50
-        };
 
-        // Enhanced features
-        this.connectionRetries = 0;
-        this.maxRetries = 3;
-        this.healthCheckInterval = null;
-        this.lastHealthCheck = 0;
-        this.connectionHealth = 'healthy';
-
-        // Add Buffer polyfill
-        this.Buffer = (function() {
-            if (typeof window !== 'undefined' && window.Buffer) {
-                return window.Buffer;
-            }
-            return {
-                from: (arr) => Uint8Array.from(arr),
-                alloc: (size) => new Uint8Array(size)
-            };
-        })();
-
-        // Initialize health monitoring
+        // Initialize connection and health monitoring
+        await this.initializeConnection();
         this.startHealthMonitoring();
-    }
-
-    async initializeConnection() {
-        const fallbackEndpoints = [
-            'https://mainnet.helius-rpc.com/?api-key=2cc2a540-0712-4bd3-aaf8-806470e42cf6',
-            'https://api.mainnet-beta.solana.com',
-            'https://solana-mainnet.g.alchemy.com/v2/your-api-key',
-            'https://rpc.ankr.com/solana'
-        ];
-
-        for (const endpoint of fallbackEndpoints) {
-            try {
-                this.connection = new solanaWeb3.Connection(endpoint, {
-                    commitment: 'confirmed',
-                    wsEndpoint: endpoint.replace('https', 'wss'),
-                    fetch: this.rateLimitedFetch.bind(this)
-                });
-                console.log('Connected to RPC:', endpoint);
-                this.connectionRetries = 0;
-                this.connectionHealth = 'healthy';
-                return;
-            } catch (error) {
-                console.error('Connection failed for endpoint:', endpoint, error);
-                this.connectionRetries++;
-            }
-        }
-        
-        if (this.connectionRetries >= this.maxRetries) {
-            this.connectionHealth = 'unhealthy';
-            throw new Error('Failed to connect to any RPC endpoint after multiple attempts');
-        }
     }
 
     startHealthMonitoring() {
@@ -198,22 +185,22 @@ class WalletManager {
     }
 
     async getBalance() {
-        if (!this.publicKey) return '0.0000';
+        if (!this.publicKey || !this.connection) return '0.0000';
 
         try {
             const balance = await this.connection.getBalance(this.publicKey);
             // Format balance to 4 decimal places
-            return (balance / solanaWeb3.LAMPORTS_PER_SOL).toFixed(4);
+            return (balance / window.solanaWeb3.LAMPORTS_PER_SOL).toFixed(4);
         } catch (error) {
             console.error('Error fetching balance:', error);
             // Try fallback endpoint
             try {
-                const fallbackRpc = new solanaWeb3.Connection(
+                const fallbackRpc = new window.solanaWeb3.Connection(
                     "https://solana-mainnet.rpc.extrnode.com",
                     'confirmed'
                 );
                 const fallbackBalance = await fallbackRpc.getBalance(this.publicKey);
-                return (fallbackBalance / solanaWeb3.LAMPORTS_PER_SOL).toFixed(4);
+                return (fallbackBalance / window.solanaWeb3.LAMPORTS_PER_SOL).toFixed(4);
             } catch (fallbackError) {
                 console.error('Fallback balance fetch failed:', fallbackError);
                 return '0.0000';
@@ -353,7 +340,7 @@ class WalletManager {
 
     async findAbandonedAccounts() {
         try {
-            if (!this.publicKey) return [];
+            if (!this.publicKey || !this.connection) return [];
             
             // Use the correct method for web3.js v2
             const accounts = await this.connection.getParsedTokenAccountsByOwner(
@@ -379,19 +366,19 @@ class WalletManager {
 
         try {
             // Get the account's balance
-            const accountBalance = await this.connection.getBalance(new solanaWeb3.PublicKey(accountPubkey));
+            const accountBalance = await this.connection.getBalance(new window.solanaWeb3.PublicKey(accountPubkey));
             
             // Calculate 5% fee
             const feeAmount = Math.floor(accountBalance * 0.05); // 5% fee
             const userAmount = accountBalance - feeAmount;
             
             // Create transaction with two instructions
-            const transaction = new solanaWeb3.Transaction();
+            const transaction = new window.solanaWeb3.Transaction();
             
             // 1. Transfer 95% to user
             transaction.add(
-                solanaWeb3.SystemProgram.transfer({
-                    fromPubkey: new solanaWeb3.PublicKey(accountPubkey),
+                window.solanaWeb3.SystemProgram.transfer({
+                    fromPubkey: new window.solanaWeb3.PublicKey(accountPubkey),
                     toPubkey: this.publicKey,
                     lamports: userAmount
                 })
@@ -399,9 +386,9 @@ class WalletManager {
             
             // 2. Transfer 5% fee to fee wallet
             transaction.add(
-                solanaWeb3.SystemProgram.transfer({
-                    fromPubkey: new solanaWeb3.PublicKey(accountPubkey),
-                    toPubkey: new solanaWeb3.PublicKey('7XYCEd1xUAkrHQt9kv4PpzXw3CSQjtGyp7DnmpveeVqs'),
+                window.solanaWeb3.SystemProgram.transfer({
+                    fromPubkey: new window.solanaWeb3.PublicKey(accountPubkey),
+                    toPubkey: new window.solanaWeb3.PublicKey('7XYCEd1xUAkrHQt9kv4PpzXw3CSQjtGyp7DnmpveeVqs'),
                     lamports: feeAmount
                 })
             );
@@ -416,7 +403,7 @@ class WalletManager {
             // Track successful claim
             this.trackEvent('account_claimed', { 
                 account: accountPubkey,
-                amount: userAmount / solanaWeb3.LAMPORTS_PER_SOL
+                amount: userAmount / window.solanaWeb3.LAMPORTS_PER_SOL
             });
             
             return signature;
@@ -493,13 +480,13 @@ class WalletManager {
                 throw new Error('Wallet not connected');
             }
 
-            const transaction = new solanaWeb3.Transaction().add(
-                solanaWeb3.SystemProgram.close({
-                    fromPubkey: new solanaWeb3.PublicKey(pubkey),
-                    toPubkey: this.publicKey,
-                    lamports: 0 // Will close entire account
-                })
-            );
+                    const transaction = new window.solanaWeb3.Transaction().add(
+            window.solanaWeb3.SystemProgram.close({
+                fromPubkey: new window.solanaWeb3.PublicKey(pubkey),
+                toPubkey: this.publicKey,
+                lamports: 0 // Will close entire account
+            })
+        );
 
             const signature = await this.currentProvider.signAndSendTransaction(transaction);
             await this.connection.confirmTransaction(signature);
@@ -515,7 +502,7 @@ class WalletManager {
         if (!this.publicKey) return '0.0000';
         try {
             const balance = await this.connection.getBalance(this.publicKey);
-            const formattedBalance = (balance / solanaWeb3.LAMPORTS_PER_SOL).toFixed(4);
+            const formattedBalance = (balance / window.solanaWeb3.LAMPORTS_PER_SOL).toFixed(4);
             // Update the balance display
             const walletInfo = document.getElementById('wallet-info');
             const walletBalance = document.getElementById('wallet-balance');
@@ -544,11 +531,11 @@ class WalletManager {
         try {
             // Here you would implement the logic to transfer the referral reward
             // This is a simplified example
-            const transaction = new solanaWeb3.Transaction().add(
-                solanaWeb3.SystemProgram.transfer({
+            const transaction = new window.solanaWeb3.Transaction().add(
+                window.solanaWeb3.SystemProgram.transfer({
                     fromPubkey: this.publicKey,
-                    toPubkey: new solanaWeb3.PublicKey(referralAddress),
-                    lamports: referralReward * solanaWeb3.LAMPORTS_PER_SOL
+                    toPubkey: new window.solanaWeb3.PublicKey(referralAddress),
+                    lamports: referralReward * window.solanaWeb3.LAMPORTS_PER_SOL
                 })
             );
 
@@ -630,9 +617,9 @@ class WalletManager {
 
     async getTokenAccountBalance(tokenAccountPubkey) {
         try {
-            const balance = await this.connection.getTokenAccountBalance(
-                new solanaWeb3.PublicKey(tokenAccountPubkey)
-            );
+                    const balance = await this.connection.getTokenAccountBalance(
+            new window.solanaWeb3.PublicKey(tokenAccountPubkey)
+        );
             return balance.value;
         } catch (error) {
             console.error('Error getting token balance:', error);
@@ -647,12 +634,12 @@ class WalletManager {
 
         try {
             // Create the transaction
-            const transaction = new solanaWeb3.Transaction();
-            
-            // Create close account instruction
-            const instruction = new solanaWeb3.TransactionInstruction({
+                    const transaction = new window.solanaWeb3.Transaction();
+        
+        // Create close account instruction
+        const instruction = new window.solanaWeb3.TransactionInstruction({
                 keys: [
-                    { pubkey: new solanaWeb3.PublicKey(tokenAccountPubkey), isSigner: false, isWritable: true },
+                    { pubkey: new window.solanaWeb3.PublicKey(tokenAccountPubkey), isSigner: false, isWritable: true },
                     { pubkey: this.publicKey, isSigner: true, isWritable: true },
                     { pubkey: this.publicKey, isSigner: false, isWritable: true },
                     { pubkey: this.TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
@@ -702,19 +689,19 @@ class WalletManager {
             for (const account of emptyAccounts) {
                 try {
                     // Get account balance before closing
-                    const balance = await this.connection.getBalance(new solanaWeb3.PublicKey(account.pubkey));
+                    const balance = await this.connection.getBalance(new window.solanaWeb3.PublicKey(account.pubkey));
                     
                     // Calculate fee and user amounts
                     const feeAmount = Math.floor(balance * 0.05); // 5% fee
                     const userAmount = balance - feeAmount;
                     
                     // Create transaction with fee split
-                    const transaction = new solanaWeb3.Transaction();
+                    const transaction = new window.solanaWeb3.Transaction();
                     
                     // Transfer 95% to user
                     transaction.add(
-                        solanaWeb3.SystemProgram.transfer({
-                            fromPubkey: new solanaWeb3.PublicKey(account.pubkey),
+                        window.solanaWeb3.SystemProgram.transfer({
+                            fromPubkey: new window.solanaWeb3.PublicKey(account.pubkey),
                             toPubkey: this.publicKey,
                             lamports: userAmount
                         })
@@ -722,9 +709,9 @@ class WalletManager {
                     
                     // Transfer 5% fee
                     transaction.add(
-                        solanaWeb3.SystemProgram.transfer({
-                            fromPubkey: new solanaWeb3.PublicKey(account.pubkey),
-                            toPubkey: new solanaWeb3.PublicKey('7XYCEd1xUAkrHQt9kv4PpzXw3CSQjtGyp7DnmpveeVqs'),
+                        window.solanaWeb3.SystemProgram.transfer({
+                            fromPubkey: new window.solanaWeb3.PublicKey(account.pubkey),
+                            toPubkey: new window.solanaWeb3.PublicKey('7XYCEd1xUAkrHQt9kv4PpzXw3CSQjtGyp7DnmpveeVqs'),
                             lamports: feeAmount
                         })
                     );
@@ -733,7 +720,7 @@ class WalletManager {
                     await this.connection.confirmTransaction(signature);
                     signatures.push(signature);
                     
-                    totalClaimed += userAmount / solanaWeb3.LAMPORTS_PER_SOL;
+                    totalClaimed += userAmount / window.solanaWeb3.LAMPORTS_PER_SOL;
                 } catch (err) {
                     console.error(`Failed to close account ${account.pubkey}:`, err);
                 }
@@ -805,12 +792,12 @@ class WalletManager {
 
     async getTokenAccountDetails(tokenAccountPubkey) {
         try {
-            const account = await this.connection.getParsedAccountInfo(
-                new solanaWeb3.PublicKey(tokenAccountPubkey)
-            );
-            const mintInfo = await this.connection.getParsedAccountInfo(
-                new solanaWeb3.PublicKey(account.data.parsed.info.mint)
-            );
+                    const account = await this.connection.getParsedAccountInfo(
+            new window.solanaWeb3.PublicKey(tokenAccountPubkey)
+        );
+        const mintInfo = await this.connection.getParsedAccountInfo(
+            new window.solanaWeb3.PublicKey(account.data.parsed.info.mint)
+        );
             return {
                 mint: account.data.parsed.info.mint,
                 owner: account.data.parsed.info.owner,
@@ -826,19 +813,19 @@ class WalletManager {
 
     async estimateClaimGas(tokenAccountPubkey) {
         try {
-            const transaction = new solanaWeb3.Transaction();
-            transaction.add(
-                new solanaWeb3.TransactionInstruction({
-                    keys: [
-                        { pubkey: new solanaWeb3.PublicKey(tokenAccountPubkey), isSigner: false, isWritable: true },
-                        { pubkey: this.publicKey, isSigner: true, isWritable: true },
-                        { pubkey: this.publicKey, isSigner: false, isWritable: true },
-                        { pubkey: this.TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-                    ],
-                    programId: this.TOKEN_PROGRAM_ID,
-                    data: new Uint8Array([9])
-                })
-            );
+                    const transaction = new window.solanaWeb3.Transaction();
+        transaction.add(
+            new window.solanaWeb3.TransactionInstruction({
+                keys: [
+                    { pubkey: new window.solanaWeb3.PublicKey(tokenAccountPubkey), isSigner: false, isWritable: true },
+                    { pubkey: this.publicKey, isSigner: true, isWritable: true },
+                    { pubkey: this.publicKey, isSigner: false, isWritable: true },
+                    { pubkey: this.TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+                ],
+                programId: this.TOKEN_PROGRAM_ID,
+                data: new Uint8Array([9])
+            })
+        );
             
             const { value: fees } = await this.connection.getFeeForMessage(
                 transaction.compileMessage(),
@@ -862,10 +849,10 @@ class WalletManager {
             
             return {
                 totalAccounts: accounts.length,
-                totalValueSOL: totalValue / solanaWeb3.LAMPORTS_PER_SOL,
-                averageValueSOL: (totalValue / accounts.length) / solanaWeb3.LAMPORTS_PER_SOL,
+                totalValueSOL: totalValue / window.solanaWeb3.LAMPORTS_PER_SOL,
+                averageValueSOL: (totalValue / accounts.length) / window.solanaWeb3.LAMPORTS_PER_SOL,
                 oldestAccountAge: Math.floor((Date.now() - oldestAccount) / (1000 * 60 * 60 * 24)),
-                potentialSavings: totalValue / solanaWeb3.LAMPORTS_PER_SOL
+                potentialSavings: totalValue / window.solanaWeb3.LAMPORTS_PER_SOL
             };
         } catch (error) {
             console.error('Error getting analytics:', error);
@@ -1347,7 +1334,7 @@ class UI {
 
         // Calculate total amount of SOL that can be reclaimed
         const totalAmount = accounts.reduce((sum, account) => 
-            sum + (account.rentExemptReserve / solanaWeb3.LAMPORTS_PER_SOL), 0);
+            sum + (account.rentExemptReserve / window.solanaWeb3.LAMPORTS_PER_SOL), 0);
         
         if (totalAmountSpan) {
             totalAmountSpan.textContent = totalAmount.toFixed(4);
@@ -1360,7 +1347,7 @@ class UI {
                         ${account.pubkey.toString().slice(0, 4)}...${account.pubkey.toString().slice(-4)}
                     </div>
                     <div class="account-balance">
-                        ${(account.rentExemptReserve / solanaWeb3.LAMPORTS_PER_SOL).toFixed(4)} SOL
+                        ${(account.rentExemptReserve / window.solanaWeb3.LAMPORTS_PER_SOL).toFixed(4)} SOL
                     </div>
                 </div>
                 <button class="btn-claim" onclick="ui.claimAccount('${account.pubkey}')">
@@ -1384,7 +1371,7 @@ class UI {
             for (const account of accounts) {
                 try {
                     await this.claimAccount(account.pubkey);
-                    totalClaimed += account.account.lamports / solanaWeb3.LAMPORTS_PER_SOL;
+                    totalClaimed += account.account.lamports / window.solanaWeb3.LAMPORTS_PER_SOL;
                 } catch (error) {
                     console.error(`Error claiming account ${account.pubkey}:`, error);
                 }
@@ -1641,8 +1628,8 @@ class UI {
             this.showLoading('Claiming account...');
             
             // Get account info before closing
-            const account = await this.walletManager.connection.getAccountInfo(new solanaWeb3.PublicKey(pubkey));
-            const claimAmount = account.lamports / solanaWeb3.LAMPORTS_PER_SOL;
+            const account = await this.walletManager.connection.getAccountInfo(new window.solanaWeb3.PublicKey(pubkey));
+            const claimAmount = account.lamports / window.solanaWeb3.LAMPORTS_PER_SOL;
 
             // Close the account
             const result = await this.walletManager.closeTokenAccount(pubkey);
